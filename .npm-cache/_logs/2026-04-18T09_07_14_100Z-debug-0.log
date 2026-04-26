@@ -1,0 +1,143 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.6.2
+2 info using node@v24.13.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Code Stack\Expense-Tracker-Web-Application-main\.npmrc
+5 silly config load:file:C:\Users\vares\.npmrc
+6 silly config load:file:C:\Users\vares\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install recharts typescript @types/react @types/react-dom
+8 verbose argv "install" "recharts" "typescript" "@types/react" "@types/react-dom"
+9 verbose logfile logs-max:10 dir:C:\Code Stack\Expense-Tracker-Web-Application-main\.npm-cache\_logs\2026-04-18T09_07_14_100Z-
+10 verbose logfile C:\Code Stack\Expense-Tracker-Web-Application-main\.npm-cache\_logs\2026-04-18T09_07_14_100Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly idealTree buildDeps
+14 silly fetch manifest recharts@*
+15 silly packumentCache full:https://registry.npmjs.org/recharts cache-miss
+16 http fetch GET https://registry.npmjs.org/npm attempt 1 failed with EACCES
+17 http fetch GET https://registry.npmjs.org/recharts attempt 1 failed with EACCES
+18 http fetch GET https://registry.npmjs.org/npm attempt 2 failed with EACCES
+19 http fetch GET https://registry.npmjs.org/recharts attempt 2 failed with EACCES
+20 http fetch GET https://registry.npmjs.org/npm attempt 3 failed with EACCES
+21 http fetch GET https://registry.npmjs.org/recharts attempt 3 failed with EACCES
+22 silly fetch manifest typescript@*
+23 silly packumentCache full:https://registry.npmjs.org/typescript cache-miss
+24 http fetch GET https://registry.npmjs.org/typescript attempt 1 failed with EACCES
+25 http fetch GET https://registry.npmjs.org/typescript attempt 2 failed with EACCES
+26 http fetch GET https://registry.npmjs.org/typescript attempt 3 failed with EACCES
+27 silly fetch manifest @types/react@*
+28 silly packumentCache full:https://registry.npmjs.org/@types%2freact cache-miss
+29 http fetch GET https://registry.npmjs.org/@types%2freact attempt 1 failed with EACCES
+30 http fetch GET https://registry.npmjs.org/@types%2freact attempt 2 failed with EACCES
+31 http fetch GET https://registry.npmjs.org/@types%2freact attempt 3 failed with EACCES
+32 silly fetch manifest @types/react-dom@*
+33 silly packumentCache full:https://registry.npmjs.org/@types%2freact-dom cache-miss
+34 http fetch GET https://registry.npmjs.org/@types%2freact-dom attempt 1 failed with EACCES
+35 http fetch GET https://registry.npmjs.org/@types%2freact-dom attempt 2 failed with EACCES
+36 http fetch GET https://registry.npmjs.org/@types%2freact-dom attempt 3 failed with EACCES
+37 silly placeDep ROOT @types/react@ OK for: expense-tracker@0.1.0 want: *
+38 silly placeDep ROOT @types/react-dom@ OK for: expense-tracker@0.1.0 want: *
+39 silly placeDep ROOT recharts@ OK for: expense-tracker@0.1.0 want: *
+40 silly placeDep ROOT typescript@ REPLACE for: expense-tracker@0.1.0 want: *
+41 warn ERESOLVE overriding peer dependency {
+41 warn ERESOLVE   code: 'ERESOLVE',
+41 warn ERESOLVE   edge: {
+41 warn ERESOLVE     type: 'peerOptional',
+41 warn ERESOLVE     name: 'typescript',
+41 warn ERESOLVE     spec: '^3.2.1 || ^4',
+41 warn ERESOLVE     from: {
+41 warn ERESOLVE       name: 'react-scripts',
+41 warn ERESOLVE       version: '5.0.1',
+41 warn ERESOLVE       location: 'node_modules/react-scripts',
+41 warn ERESOLVE       isWorkspace: false,
+41 warn ERESOLVE       dependents: [Array]
+41 warn ERESOLVE     }
+41 warn ERESOLVE   },
+41 warn ERESOLVE   dep: {
+41 warn ERESOLVE     name: 'typescript',
+41 warn ERESOLVE     version: undefined,
+41 warn ERESOLVE     errors: [ [FetchError] ],
+41 warn ERESOLVE     package: {},
+41 warn ERESOLVE     whileInstalling: {
+41 warn ERESOLVE       name: 'expense-tracker',
+41 warn ERESOLVE       version: '0.1.0',
+41 warn ERESOLVE       path: 'C:\\Code Stack\\Expense-Tracker-Web-Application-main'
+41 warn ERESOLVE     },
+41 warn ERESOLVE     location: 'node_modules/typescript',
+41 warn ERESOLVE     isWorkspace: false,
+41 warn ERESOLVE     dependents: [ [Object] ]
+41 warn ERESOLVE   },
+41 warn ERESOLVE   force: false,
+41 warn ERESOLVE   isMine: true,
+41 warn ERESOLVE   strictPeerDeps: false,
+41 warn ERESOLVE   current: {
+41 warn ERESOLVE     name: 'typescript',
+41 warn ERESOLVE     version: '4.9.5',
+41 warn ERESOLVE     location: 'node_modules/typescript',
+41 warn ERESOLVE     isWorkspace: false,
+41 warn ERESOLVE     dependents: [ [Object], [Object], [Object], [Object] ]
+41 warn ERESOLVE   }
+41 warn ERESOLVE }
+42 silly fetch manifest tsutils@^3.21.0
+43 silly packumentCache full:https://registry.npmjs.org/tsutils cache-miss
+44 http fetch GET https://registry.npmjs.org/tsutils attempt 1 failed with EACCES
+45 http fetch GET https://registry.npmjs.org/tsutils attempt 2 failed with EACCES
+46 http fetch GET https://registry.npmjs.org/tsutils attempt 3 failed with EACCES
+47 silly placeDep node_modules/@typescript-eslint/eslint-plugin tsutils@ OK for: @typescript-eslint/eslint-plugin@5.62.0 want: ^3.21.0
+48 silly fetch manifest tsutils@^3.21.0
+49 silly packumentCache full:https://registry.npmjs.org/tsutils cache-miss
+50 http fetch GET https://registry.npmjs.org/tsutils attempt 1 failed with EACCES
+51 http fetch GET https://registry.npmjs.org/tsutils attempt 2 failed with EACCES
+52 http fetch GET https://registry.npmjs.org/tsutils attempt 3 failed with EACCES
+53 silly placeDep node_modules/@typescript-eslint/type-utils tsutils@ OK for: @typescript-eslint/type-utils@5.62.0 want: ^3.21.0
+54 silly fetch manifest tsutils@^3.21.0
+55 silly packumentCache full:https://registry.npmjs.org/tsutils cache-miss
+56 http fetch GET https://registry.npmjs.org/tsutils attempt 1 failed with EACCES
+57 http fetch GET https://registry.npmjs.org/tsutils attempt 2 failed with EACCES
+58 http fetch GET https://registry.npmjs.org/tsutils attempt 3 failed with EACCES
+59 silly placeDep node_modules/@typescript-eslint/typescript-estree tsutils@ OK for: @typescript-eslint/typescript-estree@5.62.0 want: ^3.21.0
+60 silly fetch manifest fork-ts-checker-webpack-plugin@^6.5.0
+61 silly packumentCache full:https://registry.npmjs.org/fork-ts-checker-webpack-plugin cache-miss
+62 http fetch GET https://registry.npmjs.org/fork-ts-checker-webpack-plugin attempt 1 failed with EACCES
+63 http fetch GET https://registry.npmjs.org/fork-ts-checker-webpack-plugin attempt 2 failed with EACCES
+64 http fetch GET https://registry.npmjs.org/fork-ts-checker-webpack-plugin attempt 3 failed with EACCES
+65 silly placeDep node_modules/react-dev-utils fork-ts-checker-webpack-plugin@ OK for: react-dev-utils@12.0.1 want: ^6.5.0
+66 verbose type system
+67 verbose stack FetchError: request to https://registry.npmjs.org/@types%2freact failed, reason: 
+67 verbose stack     at ClientRequest.<anonymous> (C:\Program Files\nodejs\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+67 verbose stack     at ClientRequest.emit (node:events:508:28)
+67 verbose stack     at emitErrorEvent (node:_http_client:108:11)
+67 verbose stack     at _destroy (node:_http_client:962:9)
+67 verbose stack     at onSocketNT (node:_http_client:982:5)
+67 verbose stack     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+68 error code EACCES
+69 error errno EACCES
+70 error FetchError: request to https://registry.npmjs.org/@types%2freact failed, reason: 
+70 error     at ClientRequest.<anonymous> (C:\Program Files\nodejs\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+70 error     at ClientRequest.emit (node:events:508:28)
+70 error     at emitErrorEvent (node:_http_client:108:11)
+70 error     at _destroy (node:_http_client:962:9)
+70 error     at onSocketNT (node:_http_client:982:5)
+70 error     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+70 error   code: 'EACCES',
+70 error   errno: 'EACCES',
+70 error   type: 'system',
+70 error   requiredBy: '.'
+70 error }
+71 error
+71 error The operation was rejected by your operating system.
+71 error It's possible that the file was already in use (by a text editor or antivirus),
+71 error or that you lack permissions to access it.
+71 error
+71 error If you believe this might be a permissions issue, please double-check the
+71 error permissions of the file and its containing directories, or try running
+71 error the command again as root/Administrator.
+72 silly unfinished npm timer reify 1776503234739
+73 silly unfinished npm timer reify:loadTrees 1776503234740
+74 verbose cwd C:\Code Stack\Expense-Tracker-Web-Application-main
+75 verbose os Windows_NT 10.0.26200
+76 verbose node v24.13.0
+77 verbose npm  v11.6.2
+78 verbose exit 1
+79 verbose code 1
+80 error A complete log of this run can be found in: C:\Code Stack\Expense-Tracker-Web-Application-main\.npm-cache\_logs\2026-04-18T09_07_14_100Z-debug-0.log

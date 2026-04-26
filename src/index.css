@@ -1,0 +1,491 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* iOS safe-area support (0px on most devices/browsers). */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Prefer modern dynamic viewport units on mobile (prevents 100vh “address-bar” jumps). */
+@supports (height: 100dvh) {
+  .h-screen {
+    height: 100dvh;
+  }
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+}
+
+body {
+  font-family: var(--font-sans, "Plus Jakarta Sans"), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  background: var(--bg-color, #F8FAFC);
+  color: var(--text-color, #0F172A);
+}
+
+/* Ionic defaults often disable document scrolling (expects IonContent). This app uses
+   standard div layouts, so ensure the document can scroll normally. */
+html,
+body {
+  height: auto !important;
+  overflow: auto !important;
+  overflow-x: hidden !important;
+  width: 100%;
+  overscroll-behavior-x: none;
+  -webkit-overflow-scrolling: touch;
+}
+#root,
+ion-app {
+  height: auto !important;
+  min-height: var(--app-height, 100vh);
+  overflow: visible !important;
+}
+
+/* If an Ionic layout rule or a leaked scroll-lock left body fixed, force it back. */
+body {
+  position: static !important;
+}
+
+/* Keep `ion-app` from becoming a nested scroll container (can cause iOS blank gaps / clipped content). */
+ion-app {
+  min-height: var(--app-height, 100vh);
+  height: auto !important;
+  overflow: visible !important;
+  overflow-x: hidden !important;
+  contain: none !important;
+}
+
+/* Reduce GPU pressure during initial load/refresh. App enables `data-app-ready="1"` shortly after first paint. */
+html:not([data-app-ready="1"]) .backdrop-blur,
+html:not([data-app-ready="1"]) .backdrop-blur-sm,
+html:not([data-app-ready="1"]) .backdrop-blur-md,
+html:not([data-app-ready="1"]) .backdrop-blur-lg,
+html:not([data-app-ready="1"]) .backdrop-blur-xl,
+html:not([data-app-ready="1"]) .backdrop-blur-2xl,
+html:not([data-app-ready="1"]) .backdrop-blur-3xl {
+  backdrop-filter: none !important;
+}
+html:not([data-app-ready="1"]) .blur-xl,
+html:not([data-app-ready="1"]) .blur-2xl,
+html:not([data-app-ready="1"]) .blur-3xl {
+  filter: none !important;
+}
+
+/* Landing page: remove the browser scrollbar completely.
+   We lock document scroll (no right-side bar) and provide our own scroll container
+   with hidden scrollbars. */
+html.landing-root-lock,
+body.landing-root-lock {
+  overflow: hidden;
+  -ms-overflow-style: none; /* IE/Edge legacy */
+  scrollbar-width: none; /* Firefox */
+}
+html.landing-root-lock::-webkit-scrollbar,
+body.landing-root-lock::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.landing-scroll-container {
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none; /* IE/Edge legacy */
+  scrollbar-width: none; /* Firefox */
+}
+.landing-scroll-container::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chrome/Safari */
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display, "Plus Jakarta Sans"), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .landing-theme {
+    --font-sans: "Inter";
+    --font-display: "Calistoga";
+    --font-mono: "JetBrains Mono";
+
+    --landing-background: #0F172A;
+    --landing-accent: #0052FF;
+    --landing-accent-2: #4D7CFF;
+
+    font-family: var(--font-sans, "Inter"), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .landing-theme .font-mono {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace) !important;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari */
+  }
+
+  .animate-fade-in {
+    /* Keep class for compatibility, but avoid entry animations (snappier + less jank). */
+    animation: none !important;
+  }
+
+  .animate-float-in {
+    /* Keep class for compatibility, but avoid entry animations (snappier + less jank). */
+    animation: none !important;
+  }
+
+  .finvision-fade-in {
+    animation: finvisionFadeIn 3s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-md transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-opacity-50;
+  }
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+
+  /* From Uiverse.io by JaydipPrajapati1910 */
+  .loader {
+    width: 8px;
+    height: 40px;
+    border-radius: 4px;
+    display: block;
+    background-color: currentColor;
+    margin: 20px auto;
+    position: relative;
+    color: blue;
+    animation: animloader 0.3s 0.3s linear infinite alternate;
+  }
+
+  .loader::after,
+  .loader::before {
+    content: '';
+    width: 8px;
+    height: 40px;
+    border-radius: 4px;
+    background: currentColor;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 20px;
+    animation: animloader 0.3s 0.45s linear infinite alternate;
+  }
+
+@keyframes finvisionFadeIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finvision-fade-in {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+  .loader::before {
+    left: -20px;
+    animation-delay: 0s;
+  }
+
+  /* KPI-friendly variant: circular loader (matches dashboard cards) */
+  .kpi-loader {
+    width: 34px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 6px solid currentColor;
+    display: inline-block;
+    margin: 0;
+    color: rgb(99 102 241);
+    animation:
+      kpiRingClip 0.8s infinite linear alternate,
+      kpiRingFlip 1.6s infinite linear;
+  }
+
+  html.dark .kpi-loader {
+    color: rgb(129 140 248);
+  }
+
+  @keyframes kpiRingClip {
+    0% {
+      clip-path: polygon(50% 50%, 0 0, 50% 0%, 50% 0%, 50% 0%, 50% 0%, 50% 0%);
+    }
+    12.5% {
+      clip-path: polygon(50% 50%, 0 0, 50% 0%, 100% 0%, 100% 0%, 100% 0%, 100% 0%);
+    }
+    25% {
+      clip-path: polygon(50% 50%, 0 0, 50% 0%, 100% 0%, 100% 100%, 100% 100%, 100% 100%);
+    }
+    50% {
+      clip-path: polygon(50% 50%, 0 0, 50% 0%, 100% 0%, 100% 100%, 50% 100%, 0% 100%);
+    }
+    62.5% {
+      clip-path: polygon(50% 50%, 100% 0, 100% 0%, 100% 0%, 100% 100%, 50% 100%, 0% 100%);
+    }
+    75% {
+      clip-path: polygon(50% 50%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 50% 100%, 0% 100%);
+    }
+    100% {
+      clip-path: polygon(50% 50%, 50% 100%, 50% 100%, 50% 100%, 50% 100%, 50% 100%, 0% 100%);
+    }
+  }
+
+  @keyframes kpiRingFlip {
+    0% {
+      transform: scaleY(1) rotate(0deg);
+    }
+    49.99% {
+      transform: scaleY(1) rotate(135deg);
+    }
+    50% {
+      transform: scaleY(-1) rotate(0deg);
+    }
+    100% {
+      transform: scaleY(-1) rotate(-135deg);
+    }
+  }
+
+  @keyframes animloader {
+    0% {
+      height: 48px;
+    }
+
+    100% {
+      height: 4px;
+    }
+  }
+  .input-field {
+    @apply px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+
+  /* Modern "FinVision" surfaces (cards/sections) */
+  .surface {
+    /* Premium SaaS card surface (light first). */
+    @apply rounded-2xl shadow-soft ring-1 ring-slate-200/70;
+    @apply bg-white text-slate-900;
+    @apply dark:bg-slate-900/60 dark:text-slate-100 dark:ring-white/10;
+  }
+  .surface-pad {
+    @apply p-6;
+  }
+  .surface-pad-sm {
+    @apply p-4;
+  }
+  .surface-pressable {
+    @apply transition-[transform,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:ring-black/10 dark:hover:ring-white/20;
+  }
+
+  /* Inner tiles / secondary cards */
+  .tile {
+    @apply overflow-hidden rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.12];
+    @apply bg-slate-50/70 dark:bg-slate-950/30;
+  }
+  .tile-pad {
+    @apply p-4;
+  }
+
+  /* Pills / chips */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ring-black/5 dark:ring-white/[0.12];
+    @apply bg-white/70 dark:bg-slate-950/30 text-slate-700 dark:text-slate-200;
+  }
+  .chip-good {
+    @apply bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-100 ring-emerald-500/20;
+  }
+  .chip-warn {
+    @apply bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-100 ring-amber-500/20;
+  }
+  .chip-bad {
+    @apply bg-red-50 text-red-800 dark:bg-red-500/10 dark:text-red-100 ring-red-500/20;
+  }
+
+  /* Clickable chips (match .chip background, but interactive like buttons) */
+  .btn-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ring-black/5 dark:ring-white/[0.12] bg-white/60 dark:bg-slate-950/25 text-slate-700 dark:text-slate-200;
+    @apply hover:bg-white/70 dark:hover:bg-slate-950/30 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40;
+  }
+
+  /* Buttons/inputs that sit on top of surfaces */
+  .btn-surface {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold ring-1 ring-black/5 dark:ring-white/[0.12] bg-white/80 dark:bg-slate-900/40 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-900/50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40;
+  }
+  .btn-primary-gradient {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white;
+    @apply bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700;
+    @apply shadow-soft ring-1 ring-black/10 dark:ring-white/10;
+    @apply transition duration-200 ease-out;
+    @apply focus:outline-none focus:ring-2 focus:ring-indigo-500/40;
+  }
+  .control-soft {
+    @apply inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm font-semibold shadow-sm transition-colors;
+    @apply bg-slate-50 text-slate-700 ring-1 ring-slate-200/80;
+    @apply hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40;
+    @apply dark:bg-slate-900/40 dark:text-slate-200 dark:ring-white/10 dark:hover:bg-slate-900/60;
+  }
+  .input-soft {
+    @apply w-full rounded-xl px-3 py-2.5 text-sm shadow-sm transition-colors;
+    @apply bg-slate-50 text-slate-900 placeholder-slate-400 ring-1 ring-slate-200/80;
+    @apply focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:bg-white;
+    @apply dark:bg-slate-900/40 dark:text-white dark:placeholder-slate-500 dark:ring-white/10 dark:focus:bg-slate-900/60;
+  }
+  .btn-icon-ghost {
+    @apply h-9 w-9 rounded-xl grid place-items-center text-slate-500 dark:text-slate-300;
+    @apply hover:bg-slate-100/80 dark:hover:bg-white/10 transition-colors;
+    @apply focus:outline-none focus:ring-2 focus:ring-indigo-500/30;
+    @apply active:bg-slate-200/70 dark:active:bg-white/10;
+  }
+
+  /* Backward-compatible: treat .card as a surface card */
+  .card {
+    @apply surface surface-pad-sm;
+  }
+
+  /* Compact KPI cards (top-row metrics) */
+  .kpi-card {
+    @apply surface surface-pressable p-3 sm:p-4;
+    @apply min-h-[176px] sm:h-[184px];
+  }
+  .kpi-header {
+    @apply flex items-start justify-between gap-3;
+  }
+  .kpi-title {
+    @apply text-[12px] font-semibold text-slate-600;
+  }
+  .kpi-value {
+    @apply mt-2 min-w-0 truncate text-[24px] leading-[30px] sm:text-[26px] sm:leading-[32px] font-semibold tracking-[-0.03em] text-slate-950;
+  }
+  .kpi-sub {
+    @apply mt-1 text-[12px] font-semibold;
+  }
+}
+
+/* FinVision range slider (used in Dashboard prefs) */
+.finv-range {
+  --range-p: 50%;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.finv-range:focus {
+  outline: none;
+}
+
+.finv-range::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(to right, rgb(99, 102, 241) 0 var(--range-p), rgba(148, 163, 184, 0.35) var(--range-p) 100%);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+html.dark .finv-range::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, rgb(99, 102, 241) 0 var(--range-p), rgba(148, 163, 184, 0.22) var(--range-p) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.finv-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  margin-top: -4px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 55%), rgb(99, 102, 241);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.18);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+html.dark .finv-range::-webkit-slider-thumb {
+  border-color: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+}
+
+.finv-range:active::-webkit-slider-thumb {
+  transform: scale(1.08);
+}
+
+.finv-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.22), 0 10px 22px rgba(2, 6, 23, 0.18);
+}
+
+.finv-range::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+html.dark .finv-range::-moz-range-track {
+  background: rgba(148, 163, 184, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.finv-range::-moz-range-progress {
+  height: 10px;
+  border-radius: 999px;
+  background: rgb(99, 102, 241);
+}
+
+.finv-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgb(99, 102, 241);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* iOS Safari: prevent “input focus zoom” by ensuring form controls are >= 16px on small screens. */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
