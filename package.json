@@ -2,7 +2,9 @@
   "name": "expense-tracker",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://Varesh-Milind-Wani.github.io/expense-tracker",
+
+  "homepage": "https://Varesh-Milind-Wani.github.io/FinVision",
+
   "dependencies": {
     "@craco/craco": "^7.1.0",
     "@ionic/core": "^8.8.3",
@@ -23,6 +25,7 @@
     "uuid": "^11.1.0",
     "web-vitals": "^2.1.4"
   },
+
   "scripts": {
     "start": "craco start",
     "build": "craco build",
@@ -34,25 +37,9 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build"
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  },
+
   "devDependencies": {
+    "gh-pages": "^6.0.0",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.3.2"
