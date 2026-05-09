@@ -330,6 +330,31 @@ export const ExpenseProvider = ({ children }) => {
     return Math.round(pnl * 100) / 100;
   }, [transactions]);
 
+  const investmentUnrealizedPnL = useMemo(() => {
+    let pnl = 0;
+    for (const t of transactions) {
+      if (t?.type !== 'investment') continue;
+      const status = typeof t?.status === 'string' ? t.status.trim().toLowerCase() : '';
+      const exit = typeof t.exitPrice === 'number' ? t.exitPrice : Number(t.exitPrice);
+      const hasExit = t.exitPrice != null && Number.isFinite(exit) && exit >= 0;
+      if (status === 'closed' || hasExit) continue;
+
+      const rawUnreal = typeof t.unrealizedProfit === 'number' ? t.unrealizedProfit : Number(t.unrealizedProfit);
+      if (Number.isFinite(rawUnreal)) {
+        pnl += rawUnreal;
+        continue;
+      }
+
+      const qty = typeof t.quantity === 'number' ? t.quantity : Number(t.quantity);
+      const entry = typeof t.entryPrice === 'number' ? t.entryPrice : Number(t.entryPrice);
+      const current = typeof t.currentPrice === 'number' ? t.currentPrice : Number(t.currentPrice);
+      if (Number.isFinite(qty) && qty > 0 && Number.isFinite(entry) && entry > 0 && Number.isFinite(current) && current >= 0) {
+        pnl += (current - entry) * qty;
+      }
+    }
+    return Math.round(pnl * 100) / 100;
+  }, [transactions]);
+
   // Calculate totals
   const totalIncome = useMemo(() => {
     let sum = 0;
@@ -351,7 +376,10 @@ export const ExpenseProvider = ({ children }) => {
     return Math.round(sum * 100) / 100;
   }, [investmentRealizedPnL, transactions]);
 
-  const netBalance = useMemo(() => totalIncome - totalExpenses, [totalIncome, totalExpenses]);
+  const netBalance = useMemo(
+    () => Math.round((totalIncome - totalExpenses + (Number(investmentUnrealizedPnL) || 0)) * 100) / 100,
+    [investmentUnrealizedPnL, totalExpenses, totalIncome]
+  );
 
   // Action creators
   const addTransaction = useCallback((transaction) => {
@@ -400,6 +428,30 @@ export const ExpenseProvider = ({ children }) => {
         amount,
         hyperData: typeof transaction?.hyperData === 'string' ? transaction.hyperData : '',
         hyperDataItems: Array.isArray(transaction?.hyperDataItems) ? transaction.hyperDataItems : [],
+        ...(transaction?.location && typeof transaction.location === 'object'
+          ? (() => {
+              const lat = toNum(transaction.location.lat);
+              const lng = toNum(transaction.location.lng);
+              if (!Number.isFinite(lat) || !Number.isFinite(lng)) return {};
+              const accuracy = toNum(transaction.location.accuracy);
+              const address = typeof transaction.location.address === 'string' ? transaction.location.address.trim() : '';
+              const capturedAt =
+                typeof transaction.location.capturedAt === 'string' && transaction.location.capturedAt.trim()
+                  ? transaction.location.capturedAt.trim()
+                  : now.toISOString();
+              const provider = typeof transaction.location.provider === 'string' ? transaction.location.provider.trim() : '';
+              return {
+                location: {
+                  lat,
+                  lng,
+                  ...(Number.isFinite(accuracy) && accuracy > 0 ? { accuracy } : {}),
+                  ...(address ? { address } : {}),
+                  capturedAt,
+                  ...(provider ? { provider } : {}),
+                },
+              };
+            })()
+          : {}),
         ...(type === 'investment'
           ? {
               name: typeof transaction?.name === 'string' ? transaction.name.trim() : '',
@@ -499,6 +551,17 @@ export const ExpenseProvider = ({ children }) => {
                 return Number.isFinite(n) && n >= 0 ? n : null;
               })();
 
+        const hasCurrentInput = Object.prototype.hasOwnProperty.call(transaction, 'currentPrice');
+        const current =
+          hasCurrentInput && (transaction.currentPrice === null || transaction.currentPrice === '')
+            ? null
+            : hasCurrentInput
+              ? (() => {
+                  const n = toNum(updatedTransaction.currentPrice);
+                  return Number.isFinite(n) && n >= 0 ? n : null;
+                })()
+              : undefined;
+
         const amount =
           Number.isFinite(qty) && qty > 0 && Number.isFinite(entry) && entry > 0 ? round2(qty * entry) : round2(updatedTransaction.amount);
 
@@ -507,12 +570,31 @@ export const ExpenseProvider = ({ children }) => {
           updatedTransaction.profit = undefined;
           updatedTransaction.status = 'active';
           updatedTransaction.amount = amount;
+
+          if (hasCurrentInput) updatedTransaction.currentPrice = current;
+
+          const currentValue = Number.isFinite(toNum(updatedTransaction.currentPrice)) ? toNum(updatedTransaction.currentPrice) : null;
+          const nextUnrealized =
+            Number.isFinite(qty) &&
+            qty > 0 &&
+            Number.isFinite(entry) &&
+            entry > 0 &&
+            currentValue != null &&
+            Number.isFinite(currentValue)
+              ? round2((currentValue - entry) * qty)
+              : (() => {
+                  const n = toNum(updatedTransaction.unrealizedProfit);
+                  return Number.isFinite(n) ? round2(n) : null;
+                })();
+
+          updatedTransaction.unrealizedProfit = nextUnrealized;
         } else {
           updatedTransaction.exitPrice = exit;
           updatedTransaction.profit =
             Number.isFinite(qty) && qty > 0 && Number.isFinite(entry) && entry > 0 ? round2((exit - entry) * qty) : updatedTransaction.profit;
           updatedTransaction.status = 'closed';
           updatedTransaction.amount = amount;
+          updatedTransaction.unrealizedProfit = null;
         }
       } else {
         const n = typeof transaction.amount === 'number' ? transaction.amount : Number(transaction.amount);
@@ -710,6 +792,7 @@ export const ExpenseProvider = ({ children }) => {
       totalIncome,
       totalExpenses,
       netBalance,
+      investmentUnrealizedPnL,
       categoryData,
       getMonthlyData,
       addTransaction,
@@ -753,6 +836,7 @@ export const ExpenseProvider = ({ children }) => {
       totalExpenses,
       totalIncome,
       upsertNetworthSnapshot,
+      investmentUnrealizedPnL,
     ]
   );
 

@@ -117,6 +117,9 @@ const Dashboard = () => {
       const exit = Number(t?.exitPrice);
       if (Number.isFinite(qty) && qty > 0 && Number.isFinite(exit) && exit > 0) return sum + qty * exit;
 
+      const current = Number(t?.currentPrice);
+      if (Number.isFinite(qty) && qty > 0 && Number.isFinite(current) && current >= 0) return sum + qty * current;
+
       const entry = Number(t?.entryPrice);
       if (Number.isFinite(qty) && qty > 0 && Number.isFinite(entry) && entry > 0) return sum + qty * entry;
 

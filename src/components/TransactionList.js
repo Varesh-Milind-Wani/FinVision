@@ -122,10 +122,16 @@ const FilterDropdown = ({ value, onChange, buttonLabel, sections = [], className
               style={{ left, top, width, maxHeight }}
             >
               <div className="flex-1 min-h-0 overflow-auto overscroll-contain scrollbar-hide p-1.5">
-                {sections.map((section) => (
-                  <div key={section.id} className="mb-1.5">
+                {sections.map((section, sectionIndex) => (
+                  <div
+                    key={section.id}
+                    className={[
+                      'mb-1.5',
+                      section.label && sectionIndex > 0 ? 'pt-2 mt-1 border-t border-slate-200/70 dark:border-white/10' : '',
+                    ].join(' ')}
+                  >
                     {section.label ? (
-                      <div className="px-2.5 py-1 text-[11px] font-extrabold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
+                      <div className="px-2.5 py-1.5 mb-1 rounded-xl bg-slate-100/70 text-[11px] font-extrabold tracking-wide text-slate-600 dark:bg-white/5 dark:text-slate-300 uppercase">
                         {section.label}
                       </div>
                     ) : null}
@@ -171,11 +177,51 @@ const TransactionItem = ({ transaction, selected, onToggleSelect, onEdit, onDele
   const { amountsHidden, maskedText } = useAmountsVisibility();
   const round2 = useCallback((n) => Math.round((Number(n) || 0) * 100) / 100, []);
 
+  const investmentLive = useMemo(() => {
+    if (transaction.type !== 'investment') return null;
+
+    const rawStatus = String(transaction.status || '').trim().toLowerCase();
+    const hasExit = transaction.exitPrice != null && String(transaction.exitPrice).trim() !== '';
+    const status = rawStatus || (hasExit ? 'closed' : 'active');
+    if (status === 'closed') return null;
+
+    const qty = Number(transaction.quantity);
+    const entry = Number(transaction.entryPrice);
+    const current = transaction.currentPrice == null || String(transaction.currentPrice).trim() === '' ? null : Number(transaction.currentPrice);
+
+    const invested =
+      Number.isFinite(qty) && qty > 0 && Number.isFinite(entry) && entry > 0 ? round2(qty * entry) : round2(Number(transaction.amount) || 0);
+
+    const marketValue =
+      current != null && Number.isFinite(qty) && qty > 0 && Number.isFinite(current) && current >= 0 ? round2(qty * current) : null;
+
+    const rawUnreal = transaction.unrealizedProfit != null ? Number(transaction.unrealizedProfit) : null;
+    const pnl =
+      rawUnreal != null && Number.isFinite(rawUnreal)
+        ? round2(rawUnreal)
+        : marketValue != null && Number.isFinite(invested)
+          ? round2(marketValue - invested)
+          : null;
+
+    return { invested, marketValue, pnl };
+  }, [
+    round2,
+    transaction.amount,
+    transaction.currentPrice,
+    transaction.entryPrice,
+    transaction.exitPrice,
+    transaction.quantity,
+    transaction.status,
+    transaction.type,
+    transaction.unrealizedProfit,
+  ]);
+
   const amountText = useMemo(() => {
     const sign = transaction.type === 'income' ? '+' : transaction.type === 'investment' ? '•' : '−';
-    const money = amountsHidden ? maskedText : formatFromBase(transaction.amount, 'en-US');
+    const displayAmount = transaction.type === 'investment' && investmentLive?.marketValue != null ? investmentLive.marketValue : transaction.amount;
+    const money = amountsHidden ? maskedText : formatFromBase(Number(displayAmount) || 0, 'en-US');
     return `${sign} ${money}`;
-  }, [amountsHidden, formatFromBase, maskedText, transaction.amount, transaction.type]);
+  }, [amountsHidden, formatFromBase, investmentLive?.marketValue, maskedText, transaction.amount, transaction.type]);
 
   const investmentStatus = useMemo(() => {
     if (transaction.type !== 'investment') return null;
@@ -238,7 +284,7 @@ const TransactionItem = ({ transaction, selected, onToggleSelect, onEdit, onDele
     }
     if (transaction.type === 'investment') {
       const label = String(transaction.category || '').trim() || 'Investment';
-      return { label, color: '#6366F1', bg: 'rgba(99,102,241,0.14)' };
+      return { label, color: '#2563EB', bg: 'rgba(37,99,235,0.14)' };
     }
     const cat = categories.find((c) => c.id === transaction.category);
     return cat
@@ -250,7 +296,7 @@ const TransactionItem = ({ transaction, selected, onToggleSelect, onEdit, onDele
     transaction.type === 'income'
       ? { label: 'Income', color: '#10B981', bg: 'rgba(16,185,129,0.12)' }
       : transaction.type === 'investment'
-        ? { label: 'Investment', color: '#6366F1', bg: 'rgba(99,102,241,0.14)' }
+        ? { label: 'Investment', color: '#2563EB', bg: 'rgba(37,99,235,0.14)' }
         : { label: 'Expense', color: '#F43F5E', bg: 'rgba(244,63,94,0.12)' };
 
   return (
@@ -349,7 +395,7 @@ const TransactionItem = ({ transaction, selected, onToggleSelect, onEdit, onDele
                   transaction.type === 'income'
                     ? 'text-emerald-700 dark:text-emerald-300'
                     : transaction.type === 'investment'
-                      ? 'text-indigo-700 dark:text-indigo-300'
+                      ? 'text-blue-700 dark:text-blue-300'
                       : 'text-rose-700 dark:text-rose-300'
                 }`}
               >
@@ -369,6 +415,19 @@ const TransactionItem = ({ transaction, selected, onToggleSelect, onEdit, onDele
                         ? ` (${sign}${Math.abs(investmentPL.pct).toFixed(2)}%)`
                         : '';
                     return `P/L ${profitText}${pctText}`;
+                  })()}
+                </div>
+              ) : null}
+              {!investmentPL && transaction.type === 'investment' && investmentLive?.pnl != null ? (
+                <div
+                  className={`mt-0.5 text-xs font-semibold tabular-nums ${
+                    investmentLive.pnl >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'
+                  }`}
+                >
+                  {(() => {
+                    const sign = investmentLive.pnl >= 0 ? '+' : 'âˆ’';
+                    const pnlText = amountsHidden ? `${sign} ${maskedText}` : `${sign} ${formatFromBase(Math.abs(investmentLive.pnl), 'en-US')}`;
+                    return `Unrealized ${pnlText}`;
                   })()}
                 </div>
               ) : null}
@@ -441,7 +500,7 @@ const TransactionDetailsModal = ({ transaction, onClose, onEdit, onDelete }) => 
     const typeBadge = isIncome
       ? { label: 'Income', color: '#10B981', bg: 'rgba(16,185,129,0.12)', ring: 'rgba(16,185,129,0.22)' }
       : isInvestment
-        ? { label: 'Investment', color: '#6366F1', bg: 'rgba(99,102,241,0.14)', ring: 'rgba(99,102,241,0.22)' }
+        ? { label: 'Investment', color: '#2563EB', bg: 'rgba(37,99,235,0.14)', ring: 'rgba(37,99,235,0.22)' }
         : { label: 'Expense', color: '#F43F5E', bg: 'rgba(244,63,94,0.12)', ring: 'rgba(244,63,94,0.22)' };
 
     const incomeMap = {
@@ -467,8 +526,8 @@ const TransactionDetailsModal = ({ transaction, onClose, onEdit, onDelete }) => 
       categoryBg = 'rgba(16,185,129,0.12)';
     } else if (isInvestment) {
       categoryLabel = String(transaction.category || '').trim() || 'Investment';
-      categoryColor = '#6366F1';
-      categoryBg = 'rgba(99,102,241,0.14)';
+      categoryColor = '#2563EB';
+      categoryBg = 'rgba(37,99,235,0.14)';
     } else {
       const cat = (categories || []).find((c) => c.id === transaction.category);
       if (cat) {
@@ -494,8 +553,20 @@ const TransactionDetailsModal = ({ transaction, onClose, onEdit, onDelete }) => 
 
   if (!transaction || !meta) return null;
 
+  const investmentMarketValue = (() => {
+    if (transaction.type !== 'investment') return null;
+    const rawStatus = String(transaction.status || '').trim().toLowerCase();
+    const hasExit = transaction.exitPrice != null && String(transaction.exitPrice).trim() !== '';
+    const status = rawStatus || (hasExit ? 'closed' : 'active');
+    if (status === 'closed') return null;
+    const qty = Number(transaction.quantity);
+    const current = transaction.currentPrice == null || String(transaction.currentPrice).trim() === '' ? null : Number(transaction.currentPrice);
+    if (!(Number.isFinite(qty) && qty > 0 && current != null && Number.isFinite(current) && current >= 0)) return null;
+    return Math.round(qty * current * 100) / 100;
+  })();
+
   const amountText = `${transaction.type === 'income' ? '+' : transaction.type === 'investment' ? '•' : '−'} ${
-    amountsHidden ? maskedText : formatFromBase(transaction.amount, 'en-US')
+    amountsHidden ? maskedText : formatFromBase(Number(investmentMarketValue ?? transaction.amount) || 0, 'en-US')
   }`;
   const hasTime = !!transaction.time;
   const createdAt = transaction.createdAt ? new Date(transaction.createdAt) : null;
@@ -594,6 +665,16 @@ const TransactionDetailsModal = ({ transaction, onClose, onEdit, onDelete }) => 
                   }
                 />
                 <Field
+                  label="Current Price"
+                  value={
+                    transaction.currentPrice != null
+                      ? amountsHidden
+                        ? maskedText
+                        : formatFromBase(Number(transaction.currentPrice) || 0, 'en-US')
+                      : '\u2014'
+                  }
+                />
+                <Field
                   label="Status"
                   value={transaction.status ? String(transaction.status) : transaction.exitPrice != null ? 'closed' : 'active'}
                 />
@@ -602,6 +683,14 @@ const TransactionDetailsModal = ({ transaction, onClose, onEdit, onDelete }) => 
                     label="Profit/Loss"
                     value={`${Number(transaction.profit) >= 0 ? '+' : '−'} ${
                       amountsHidden ? maskedText : formatFromBase(Math.abs(Number(transaction.profit) || 0), 'en-US')
+                    }`}
+                  />
+                ) : null}
+                {transaction.profit == null && transaction.unrealizedProfit != null ? (
+                  <Field
+                    label="Unrealized P/L"
+                    value={`${Number(transaction.unrealizedProfit) >= 0 ? '+' : '-'} ${
+                      amountsHidden ? maskedText : formatFromBase(Math.abs(Number(transaction.unrealizedProfit) || 0), 'en-US')
                     }`}
                   />
                 ) : null}
@@ -762,7 +851,7 @@ const DeleteTransactionsModal = ({ transactions = [], onCancel, onConfirm }) => 
                       t.type === 'income'
                         ? 'text-emerald-700 dark:text-emerald-300'
                         : t.type === 'investment'
-                          ? 'text-indigo-700 dark:text-indigo-300'
+                          ? 'text-blue-700 dark:text-blue-300'
                           : 'text-rose-700 dark:text-rose-300'
                     }`}
                     title={getAmountText(t)}
@@ -1065,6 +1154,11 @@ const TransactionList = () => {
               buttonLabel={
                 filterType === 'all' ? 'All Types' : filterType === 'income' ? 'Income' : filterType === 'investment' ? 'Investment' : 'Expense'
               }
+              className={
+                filterType === 'investment'
+                  ? 'bg-blue-50 text-blue-700 ring-blue-200/80 hover:bg-blue-50/70 dark:bg-blue-500/10 dark:text-blue-200 dark:ring-blue-500/20 dark:hover:bg-blue-500/15'
+                  : ''
+              }
               sections={[
                 {
                   id: 'types',
@@ -1115,7 +1209,16 @@ const TransactionList = () => {
               )}
               
               {filterType !== 'all' && (
-                <span className="inline-flex items-center px-2.5 py-1 bg-violet-50 text-violet-900 ring-1 ring-violet-200/70 dark:bg-violet-500/10 dark:text-violet-100 dark:ring-violet-500/20 rounded-full text-xs font-semibold">
+                <span
+                  className={[
+                    'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1',
+                    filterType === 'income'
+                      ? 'bg-emerald-50 text-emerald-900 ring-emerald-200/70 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-500/20'
+                      : filterType === 'investment'
+                        ? 'bg-blue-50 text-blue-900 ring-blue-200/70 dark:bg-blue-500/10 dark:text-blue-100 dark:ring-blue-500/20'
+                        : 'bg-rose-50 text-rose-900 ring-rose-200/70 dark:bg-rose-500/10 dark:text-rose-100 dark:ring-rose-500/20',
+                  ].join(' ')}
+                >
                   {filterType === 'income' ? 'Income' : filterType === 'investment' ? 'Investment' : 'Expense'}
                 </span>
               )}

@@ -227,7 +227,8 @@ const ExportImport = () => {
         contentType = 'application/json';
       } else if (format === 'csv') {
         // CSV is transactions-only (flat table). Investment-specific fields are included as extra columns.
-        const csvHeader = 'Date,Description,Category,Amount,Type,Quantity,EntryPrice,ExitPrice\n';
+        const csvHeader =
+          'Date,Description,Category,Amount,Type,Quantity,EntryPrice,ExitPrice,CurrentPrice,LocationLat,LocationLng,LocationAccuracy,LocationAddress,LocationCapturedAt\n';
 
         const csvRows = (transactions || [])
           .map((transaction) => {
@@ -235,6 +236,14 @@ const ExportImport = () => {
             const quantity = isInvestment ? transaction?.quantity : '';
             const entryPrice = isInvestment ? transaction?.entryPrice : '';
             const exitPrice = isInvestment ? transaction?.exitPrice : '';
+            const currentPrice = isInvestment ? transaction?.currentPrice : '';
+
+            const loc = transaction?.location && typeof transaction.location === 'object' ? transaction.location : null;
+            const locLat = loc?.lat ?? '';
+            const locLng = loc?.lng ?? '';
+            const locAcc = loc?.accuracy ?? '';
+            const locAddr = loc?.address ?? '';
+            const locCapturedAt = loc?.capturedAt ?? '';
 
             const cols = [
               transaction?.date || '',
@@ -245,6 +254,12 @@ const ExportImport = () => {
               quantity ?? '',
               entryPrice ?? '',
               exitPrice ?? '',
+              currentPrice ?? '',
+              locLat ?? '',
+              locLng ?? '',
+              locAcc ?? '',
+              locAddr ?? '',
+              locCapturedAt ?? '',
             ];
             return cols.map(escapeCsv).join(',');
           })
@@ -346,12 +361,32 @@ const ExportImport = () => {
           const required = ['date', 'description', 'category', 'amount', 'type'];
           const hasRequired = required.every((k) => idx[k] != null);
           if (!hasRequired) {
-            throw new Error('Invalid CSV header. Expected: Date,Description,Category,Amount,Type (plus optional Quantity,EntryPrice,ExitPrice).');
+            throw new Error(
+              'Invalid CSV header. Expected: Date,Description,Category,Amount,Type (plus optional Quantity,EntryPrice,ExitPrice,CurrentPrice and LocationLat,LocationLng,LocationAccuracy,LocationAddress,LocationCapturedAt).'
+            );
           }
 
           const get = (row, key) => {
             const i = idx[key];
             return i == null ? '' : row[i];
+          };
+
+          const readLocationFromRow = (row) => {
+            const lat = parseAmount(get(row, 'locationlat'));
+            const lng = parseAmount(get(row, 'locationlng'));
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            const accuracy = parseAmount(get(row, 'locationaccuracy'));
+            const address = String(get(row, 'locationaddress') || '').trim();
+            const capturedAtRaw = String(get(row, 'locationcapturedat') || '').trim();
+            const capturedAt = Number.isFinite(Date.parse(capturedAtRaw)) ? capturedAtRaw : new Date().toISOString();
+            return {
+              lat,
+              lng,
+              ...(Number.isFinite(accuracy) && accuracy > 0 ? { accuracy } : {}),
+              ...(address ? { address } : {}),
+              capturedAt,
+              provider: 'import-csv',
+            };
           };
 
           const txs = [];
@@ -365,6 +400,7 @@ const ExportImport = () => {
             const typeRaw = String(get(row, 'type') || '').trim().toLowerCase();
             const type = typeRaw === 'income' || typeRaw === 'expense' || typeRaw === 'investment' ? typeRaw : 'expense';
             const amt = Math.abs(parseAmount(get(row, 'amount')) || 0);
+            const location = readLocationFromRow(row);
 
             if (!description && type !== 'investment') continue;
 
@@ -372,13 +408,17 @@ const ExportImport = () => {
               const quantity = parseAmount(get(row, 'quantity'));
               const entryPrice = parseAmount(get(row, 'entryprice'));
               const exitPrice = parseAmount(get(row, 'exitprice'));
+              const currentPrice = parseAmount(get(row, 'currentprice'));
               const qtyOk = Number.isFinite(quantity) && quantity > 0;
               const entryOk = Number.isFinite(entryPrice) && entryPrice > 0;
               const exitOk = Number.isFinite(exitPrice) && exitPrice >= 0;
+              const currentOk = Number.isFinite(currentPrice) && currentPrice >= 0;
 
               const amount = qtyOk && entryOk ? Math.round(quantity * entryPrice * 100) / 100 : amt;
               const hasExit = exitOk;
               const profit = qtyOk && entryOk && exitOk ? Math.round((exitPrice - entryPrice) * quantity * 100) / 100 : null;
+              const unrealizedProfit =
+                !hasExit && qtyOk && entryOk && currentOk ? Math.round((currentPrice - entryPrice) * quantity * 100) / 100 : null;
 
               txs.push({
                 id: uuidv4(),
@@ -392,9 +432,12 @@ const ExportImport = () => {
                 entryPrice: entryOk ? entryPrice : 0,
                 exitPrice: hasExit ? exitPrice : null,
                 profit: profit != null ? profit : null,
+                currentPrice: !hasExit && currentOk ? currentPrice : null,
+                unrealizedProfit: unrealizedProfit != null ? unrealizedProfit : null,
                 status: hasExit ? 'closed' : 'active',
                 hyperData: '',
                 hyperDataItems: [],
+                ...(location ? { location } : {}),
               });
             } else {
               txs.push({
@@ -404,6 +447,7 @@ const ExportImport = () => {
                 category,
                 description,
                 amount: amt > 0 ? amt : 0,
+                ...(location ? { location } : {}),
               });
             }
           }
@@ -463,7 +507,7 @@ const ExportImport = () => {
           </div>
           
           <p className="text-slate-600 dark:text-slate-300 mb-4">
-            Download a full backup (recommended) in JSON, or a transactions-only CSV (includes investment Quantity/EntryPrice/ExitPrice columns).
+            Download a full backup (recommended) in JSON, or a transactions-only CSV (includes investment Quantity/EntryPrice/ExitPrice/CurrentPrice + location columns).
           </p>
           
           <div className="flex space-x-3 mb-4">

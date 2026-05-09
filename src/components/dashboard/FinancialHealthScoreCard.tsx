@@ -50,7 +50,7 @@ export default function FinancialHealthScoreCard() {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [score]);
 
   const pct = Math.round(display);

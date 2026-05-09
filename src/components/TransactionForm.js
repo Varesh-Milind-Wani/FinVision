@@ -3,6 +3,14 @@ import { createPortal } from 'react-dom';
 import { useExpenseContext } from '../contexts/ExpenseContext';
 import { getCurrencySymbol } from '../utils/formatUtils';
 import { evaluateAmountExpression, formatAmountForInput, hasMathOperators } from '../utils/amountMath';
+import {
+  buildOsmEmbedUrl,
+  getCurrentPosition,
+  queryGeolocationPermission,
+  readLocationAttachPref,
+  reverseGeocodeNominatim,
+  writeLocationAttachPref,
+} from '../utils/location';
 
 const HYPERDATA_SPLIT_REGEX = /[\n,]+/;
 
@@ -300,6 +308,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
     quantity: '',
     entryPrice: '',
     exitPrice: '',
+    currentPrice: '',
   }), []);
 
   const [formData, setFormData] = useState(initialFormState);
@@ -309,6 +318,12 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
   const [amountPreview, setAmountPreview] = useState(null); // { value:number } | null
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmDraft, setConfirmDraft] = useState(null); // { payload, summary } | null
+  const [attachLocation, setAttachLocation] = useState(() => readLocationAttachPref());
+  const [geoPermission, setGeoPermission] = useState(null); // 'granted' | 'prompt' | 'denied' | null
+  const [locationPreview, setLocationPreview] = useState(null); // { lat, lng, accuracy, address, capturedAt } | null
+  const [locationBusy, setLocationBusy] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const [mapNonce, setMapNonce] = useState(0);
   const [dateText, setDateText] = useState(() => {
     const iso = initialFormState.date;
     const m = String(iso || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -368,6 +383,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
         next.quantity = editTransaction.quantity != null ? String(editTransaction.quantity) : '';
         next.entryPrice = editTransaction.entryPrice != null ? String(editTransaction.entryPrice) : '';
         next.exitPrice = editTransaction.exitPrice != null ? String(editTransaction.exitPrice) : '';
+        next.currentPrice = editTransaction.currentPrice != null ? String(editTransaction.currentPrice) : '';
         // keep expense/income category untouched for later switching
         next.category = initialFormState.category;
         next.description = next.name;
@@ -391,11 +407,40 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
       setFormData(initialFormState);
       setHyperDataItems([]);
     }
+    setLocationError('');
+    if (editTransaction?.location && typeof editTransaction.location === 'object') {
+      const lat = Number(editTransaction.location.lat);
+      const lng = Number(editTransaction.location.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        setLocationPreview({
+          lat,
+          lng,
+          accuracy: Number.isFinite(Number(editTransaction.location.accuracy)) ? Number(editTransaction.location.accuracy) : undefined,
+          address: typeof editTransaction.location.address === 'string' ? editTransaction.location.address : '',
+          capturedAt: typeof editTransaction.location.capturedAt === 'string' ? editTransaction.location.capturedAt : '',
+        });
+      } else {
+        setLocationPreview(null);
+      }
+    } else if (!editTransaction) {
+      setLocationPreview(null);
+    }
     setConfirmOpen(false);
     setConfirmDraft(null);
     const iso = (editTransaction?.date || initialFormState.date);
     setDateText(isoToDdMmYyyy(iso));
   }, [editTransaction, initialFormState, isoToDdMmYyyy]);
+
+  useEffect(() => {
+    let alive = true;
+    queryGeolocationPermission().then((state) => {
+      if (!alive) return;
+      if (state) setGeoPermission(state);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (editTransaction) return;
@@ -436,7 +481,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
       // ignore
     }
     // Only restore once on mount (fresh entry). Subsequent drafts are handled by the persist effect below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, []);
 
   useEffect(() => {
@@ -496,32 +541,49 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
 
   const investmentNumbers = useMemo(() => {
     if (formData.type !== 'investment') {
-      return { ok: false, amount: 0, profit: null, status: 'active', quantity: null, entryPrice: null, exitPrice: null };
+      return {
+        ok: false,
+        amount: 0,
+        profit: null,
+        unrealizedProfit: null,
+        status: 'active',
+        quantity: null,
+        entryPrice: null,
+        exitPrice: null,
+        currentPrice: null,
+      };
     }
 
     const quantity = Number(String(formData.quantity || '').trim());
     const entryPrice = Number(String(formData.entryPrice || '').trim());
     const exitPriceRaw = String(formData.exitPrice || '').trim();
     const exitPrice = exitPriceRaw ? Number(exitPriceRaw) : null;
+    const currentPriceRaw = String(formData.currentPrice || '').trim();
+    const currentPrice = currentPriceRaw ? Number(currentPriceRaw) : null;
 
     const qtyOk = Number.isFinite(quantity) && quantity > 0;
     const entryOk = Number.isFinite(entryPrice) && entryPrice > 0;
     const exitOk = exitPrice == null || (Number.isFinite(exitPrice) && exitPrice >= 0);
+    const currentOk = currentPrice == null || (Number.isFinite(currentPrice) && currentPrice >= 0);
 
     const amount = qtyOk && entryOk ? round2(quantity * entryPrice) : 0;
     const profit = qtyOk && entryOk && exitOk && exitPrice != null ? round2((exitPrice - entryPrice) * quantity) : null;
     const status = exitPrice != null && exitOk ? 'closed' : 'active';
+    const unrealizedProfit =
+      status === 'active' && qtyOk && entryOk && currentOk && currentPrice != null ? round2((currentPrice - entryPrice) * quantity) : null;
 
     return {
-      ok: qtyOk && entryOk && exitOk,
+      ok: qtyOk && entryOk && exitOk && currentOk,
       amount,
       profit,
+      unrealizedProfit,
       status,
       quantity: qtyOk ? quantity : null,
       entryPrice: entryOk ? entryPrice : null,
       exitPrice: exitOk ? exitPrice : null,
+      currentPrice: currentOk ? currentPrice : null,
     };
-  }, [formData.entryPrice, formData.exitPrice, formData.quantity, formData.type, round2]);
+  }, [formData.currentPrice, formData.entryPrice, formData.exitPrice, formData.quantity, formData.type, round2]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -554,6 +616,14 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
         const exitPrice = Number(exitText);
         if (!Number.isFinite(exitPrice) || exitPrice < 0) {
           newErrors.exitPrice = 'Enter a valid exit price';
+        }
+      }
+
+      const currentText = String(formData.currentPrice || '').trim();
+      if (currentText) {
+        const currentPrice = Number(currentText);
+        if (!Number.isFinite(currentPrice) || currentPrice < 0) {
+          newErrors.currentPrice = 'Enter a valid current price';
         }
       }
 
@@ -696,14 +766,19 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
       const entryPrice = Number(String(formData.entryPrice || '').trim());
       const exitText = String(formData.exitPrice || '').trim();
       const exitPrice = exitText ? Number(exitText) : null;
+      const currentText = String(formData.currentPrice || '').trim();
+      const currentPrice = currentText ? Number(currentText) : null;
 
       const qtyOk = Number.isFinite(quantity) && quantity > 0;
       const entryOk = Number.isFinite(entryPrice) && entryPrice > 0;
       const exitOk = exitPrice == null || (Number.isFinite(exitPrice) && exitPrice >= 0);
+      const currentOk = currentPrice == null || (Number.isFinite(currentPrice) && currentPrice >= 0);
 
       const amount = qtyOk && entryOk ? round2(quantity * entryPrice) : 0;
       const profit = qtyOk && entryOk && exitOk && exitPrice != null ? round2((exitPrice - entryPrice) * quantity) : null;
       const status = exitPrice != null && exitOk ? 'closed' : 'active';
+      const unrealizedProfit =
+        status === 'active' && qtyOk && entryOk && currentOk && currentPrice != null ? round2((currentPrice - entryPrice) * quantity) : null;
 
       const payload = {
         id: editTransaction ? editTransaction.id : formData.id,
@@ -716,6 +791,8 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
         entryPrice: entryOk ? entryPrice : 0,
         ...(exitText ? (exitOk ? { exitPrice } : {}) : { exitPrice: null }),
         ...(profit != null ? { profit } : { profit: null }),
+        ...(currentText ? (currentOk ? { currentPrice } : {}) : { currentPrice: null }),
+        ...(unrealizedProfit != null ? { unrealizedProfit } : { unrealizedProfit: null }),
         status,
         amount,
         hyperData: '',
@@ -724,6 +801,10 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
 
       const amountText = `${currency} ${formatAmountForInput(amount, { maxDecimals: 2 })}`;
       const profitText = profit == null ? null : `${profit >= 0 ? '+' : '−'}${currency} ${formatAmountForInput(Math.abs(profit), { maxDecimals: 2 })}`;
+      const unrealizedProfitText =
+        unrealizedProfit == null
+          ? null
+          : `${unrealizedProfit >= 0 ? '+' : '−'}${currency} ${formatAmountForInput(Math.abs(unrealizedProfit), { maxDecimals: 2 })}`;
 
       return {
         payload,
@@ -736,10 +817,12 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
           dateText: formatDateLabel(payload.date),
           statusLabel: status === 'closed' ? 'Closed' : 'Active',
           profitText,
+          unrealizedProfitText,
           investment: {
             quantity: qtyOk ? quantity : null,
             entryPrice: entryOk ? entryPrice : null,
             exitPrice: exitPrice != null && exitOk ? exitPrice : null,
+            currentPrice: currentPrice != null && currentOk ? currentPrice : null,
           },
         },
       };
@@ -759,6 +842,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
     };
 
     const isIncome = payload.type === 'income';
+    const isInvestment = payload.type === 'investment';
     const categoryList = isIncome ? incomeCategories : categories;
     const categoryName = (categoryList || []).find((c) => c.id === payload.category)?.name || payload.category || 'Category';
 
@@ -769,7 +853,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
       payload,
       summary: {
         title: editTransaction ? 'Confirm changes' : 'Confirm transaction',
-        typeLabel: isIncome ? 'Income' : 'Expense',
+        typeLabel: isIncome ? 'Income' : isInvestment ? 'Investment' : 'Expense',
         categoryName,
         amountText,
         description: payload.description || '',
@@ -780,7 +864,96 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
     };
   };
 
-  const handleSubmit = (e) => {
+  const refreshLocationPreview = useCallback(async () => {
+    setLocationError('');
+    if (!attachLocation) {
+      setLocationPreview(null);
+      return null;
+    }
+
+    setLocationBusy(true);
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    try {
+      const pos = await getCurrentPosition({ timeoutMs: 12000, enableHighAccuracy: true, maximumAgeMs: 15000 });
+      const lat = pos?.coords?.latitude;
+      const lng = pos?.coords?.longitude;
+      const accuracy = pos?.coords?.accuracy;
+      const capturedAt = new Date(pos?.timestamp || Date.now()).toISOString();
+
+      const out = {
+        lat: Number(lat),
+        lng: Number(lng),
+        accuracy: Number.isFinite(Number(accuracy)) ? Number(accuracy) : undefined,
+        capturedAt,
+        address: '',
+      };
+
+      if (Number.isFinite(out.lat) && Number.isFinite(out.lng)) {
+        const rev = await reverseGeocodeNominatim({ lat: out.lat, lng: out.lng, signal: ac?.signal });
+        if (rev.ok) out.address = rev.address;
+      }
+
+      const perm = await queryGeolocationPermission();
+      if (perm) setGeoPermission(perm);
+
+      setLocationPreview(out);
+      return out;
+    } catch (e2) {
+      const perm = await queryGeolocationPermission();
+      if (perm) setGeoPermission(perm);
+      const msg = e2?.message || (e2?.code === 1 ? 'Location permission denied' : 'Unable to get location');
+      setLocationError(String(msg));
+      setLocationPreview(null);
+      return null;
+    } finally {
+      if (ac) ac.abort();
+      setLocationBusy(false);
+    }
+  }, [attachLocation]);
+
+  useEffect(() => {
+    if (!attachLocation) return;
+    if (locationBusy || isSubmitting) return;
+    if (geoPermission === 'denied') return;
+
+    const capturedAt = locationPreview?.capturedAt ? new Date(locationPreview.capturedAt).getTime() : 0;
+    const fresh = Number.isFinite(capturedAt) && Date.now() - capturedAt < 2 * 60 * 1000; // 2 min
+    if (fresh) return;
+
+    // Auto-load a preview when the toggle is ON so the map appears without an extra click.
+    const t = setTimeout(() => {
+      refreshLocationPreview();
+    }, 150);
+    return () => clearTimeout(t);
+  }, [attachLocation, geoPermission, isSubmitting, locationBusy, locationPreview?.capturedAt, refreshLocationPreview]);
+
+  const maybeAttachLocationToTx = useCallback(
+    async (tx) => {
+      if (!attachLocation) return tx;
+
+      // If we already have a fresh preview, reuse it.
+      const existing = locationPreview;
+      const isFresh =
+        existing?.capturedAt && Date.now() - new Date(existing.capturedAt).getTime() < 2 * 60 * 1000; // 2 min
+      const loc = isFresh ? existing : await refreshLocationPreview();
+      if (!Number.isFinite(Number(loc?.lat)) || !Number.isFinite(Number(loc?.lng))) return tx;
+
+      return {
+        ...tx,
+        location: {
+          lat: loc.lat,
+          lng: loc.lng,
+          ...(Number.isFinite(Number(loc.accuracy)) ? { accuracy: loc.accuracy } : {}),
+          ...(loc.address ? { address: loc.address } : {}),
+          capturedAt: loc.capturedAt || new Date().toISOString(),
+          provider: 'geolocation+nominatim',
+        },
+      };
+    },
+    [attachLocation, locationPreview, refreshLocationPreview]
+  );
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     // If the user typed an expression, resolve it before validating/submitting.
@@ -802,7 +975,8 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
 
     setIsSubmitting(true);
     try {
-      const tx = confirmDraft?.payload || built.payload;
+      const txBase = confirmDraft?.payload || built.payload;
+      const tx = await maybeAttachLocationToTx(txBase);
 
       if (editTransaction) {
         console.log("Submitting updated transaction with ID:", tx.id);
@@ -868,7 +1042,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
     formData.type === 'income'
       ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/25 dark:text-emerald-100 ring-emerald-500/25'
       : formData.type === 'investment'
-        ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/25 dark:text-indigo-100 ring-indigo-500/25'
+        ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/25 dark:text-blue-100 ring-blue-500/25'
         : 'bg-rose-100 text-rose-800 dark:bg-rose-500/25 dark:text-rose-100 ring-rose-500/25';
 
   const typeAccent =
@@ -880,9 +1054,9 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
         }
       : formData.type === 'investment'
         ? {
-            ring: 'ring-indigo-500/20 dark:ring-indigo-400/25',
-            text: 'text-indigo-700 dark:text-indigo-200',
-            bg: 'bg-indigo-500/10 dark:bg-indigo-500/10',
+            ring: 'ring-blue-500/20 dark:ring-blue-400/25',
+            text: 'text-blue-700 dark:text-blue-200',
+            bg: 'bg-blue-500/10 dark:bg-blue-500/10',
           }
         : {
             ring: 'ring-rose-500/20 dark:ring-rose-400/25',
@@ -891,6 +1065,17 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
           };
 
   const typeLabel = formData.type === 'income' ? 'Income' : formData.type === 'investment' ? 'Investment' : 'Expense';
+  const osmEmbedUrl = useMemo(() => {
+    if (!locationPreview) return null;
+    const base = buildOsmEmbedUrl({
+      lat: locationPreview.lat,
+      lng: locationPreview.lng,
+      accuracyMeters: locationPreview.accuracy,
+    });
+    if (!base) return null;
+    // Force reload when user hits "Recenter" even if coords didn't change.
+    return `${base}${base.includes('?') ? '&' : '?'}t=${encodeURIComponent(String(mapNonce || 0))}`;
+  }, [locationPreview, mapNonce]);
 
   // selectedCategory reserved for future (UI label lookup)
 
@@ -944,6 +1129,20 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
                   }`}
                 >
                   {confirmDraft.summary.profitText}
+                </div>
+              </div>
+            ) : null}
+            {confirmDraft.summary.unrealizedProfitText ? (
+              <div className="rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.10] bg-white/70 dark:bg-slate-950/20 px-4 py-3">
+                <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">Unrealized P/L</div>
+                <div
+                  className={`mt-1 text-sm font-extrabold tabular-nums ${
+                    String(confirmDraft.summary.unrealizedProfitText || '').trim().startsWith('-')
+                      ? 'text-rose-700 dark:text-rose-200'
+                      : 'text-emerald-700 dark:text-emerald-200'
+                  }`}
+                >
+                  {confirmDraft.summary.unrealizedProfitText}
                 </div>
               </div>
             ) : null}
@@ -1208,6 +1407,34 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
             </div>
             {errors.exitPrice && <p className="text-red-500 text-xs mt-1">{errors.exitPrice}</p>}
 
+            <div className="mt-3">
+              <label htmlFor="currentPrice" className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                Current Price <span className="text-xs font-medium text-slate-500 dark:text-slate-400">(optional)</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 dark:text-gray-400">{getCurrencySymbol(currencyCode)}</span>
+                </div>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  id="currentPrice"
+                  name="currentPrice"
+                  className={[
+                    'input-soft pl-8 pr-3 tabular-nums',
+                    embedded ? 'py-2' : 'py-2.5',
+                    errors.currentPrice ? 'ring-2 ring-rose-500/30 focus:ring-rose-500/40' : '',
+                  ].join(' ')}
+                  placeholder="Optional: track unrealized P/L"
+                  value={formData.currentPrice}
+                  onChange={handleChange}
+                />
+              </div>
+              {errors.currentPrice && <p className="text-red-500 text-xs mt-1">{errors.currentPrice}</p>}
+              <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">For active investments only (doesn’t close the position).</div>
+            </div>
+
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 dark:bg-slate-950/20 ring-1 ring-slate-200/80 dark:ring-white/[0.10] px-3 py-2">
               <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                 Status: <span className={`font-extrabold ${investmentNumbers.status === 'closed' ? 'text-indigo-700 dark:text-indigo-200' : 'text-slate-700 dark:text-slate-200'}`}>{investmentNumbers.status === 'closed' ? 'Closed' : 'Active'}</span>
@@ -1218,8 +1445,14 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
                   {investmentNumbers.profit >= 0 ? '+' : '−'}
                   {getCurrencySymbol(currencyCode)} {formatAmountForInput(Math.abs(investmentNumbers.profit), { maxDecimals: 2 })}
                 </div>
+              ) : investmentNumbers.unrealizedProfit != null ? (
+                <div className={`text-xs font-extrabold tabular-nums ${investmentNumbers.unrealizedProfit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
+                  Unrealized {investmentNumbers.unrealizedProfit >= 0 ? 'Profit' : 'Loss'}:{' '}
+                  {investmentNumbers.unrealizedProfit >= 0 ? '+' : '-'}
+                  {getCurrencySymbol(currencyCode)} {formatAmountForInput(Math.abs(investmentNumbers.unrealizedProfit), { maxDecimals: 2 })}
+                </div>
               ) : (
-                <div className="text-xs text-slate-500 dark:text-slate-400">Add exit price to preview P/L.</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Add exit price (realized) or current price (unrealized) to preview P/L.</div>
               )}
             </div>
           </div>
@@ -1418,7 +1651,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
         </>
       )}
       
-      <div className={embedded ? 'mb-3' : 'mb-4'}>
+      <div className={embedded ? 'mb-4' : 'mb-6'}>
         <label htmlFor="date" className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
           Date {!embedded ? <span className="text-xs font-medium text-slate-500 dark:text-slate-400">(optional)</span> : null}
         </label>
@@ -1481,6 +1714,142 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
             }}
           />
         </div>
+      </div>
+
+      <div className={[embedded ? 'mb-3' : 'mb-4', embedded ? 'pt-3' : 'pt-5'].join(' ')}>
+        <div className="flex items-center justify-between gap-3 min-w-0">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 leading-none">Location</div>
+          </div>
+          <label className="flex-none inline-flex items-center justify-end gap-2 min-w-[96px] cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={attachLocation}
+              onChange={(e) => {
+                const next = Boolean(e.target.checked);
+                setAttachLocation(next);
+                writeLocationAttachPref(next);
+                setLocationError('');
+                if (!next) setLocationPreview(null);
+              }}
+            />
+            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap leading-none">
+              {attachLocation ? 'On' : 'Off'}
+            </span>
+            <span
+              aria-hidden="true"
+              className={[
+                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors ring-1 ring-black/5 dark:ring-white/[0.12]',
+                attachLocation ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform',
+                  attachLocation ? 'translate-x-5' : 'translate-x-1',
+                ].join(' ')}
+              />
+            </span>
+          </label>
+        </div>
+        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Attach your current location to this {editTransaction ? 'update' : 'transaction'}. Uses browser GPS / Wi-Fi and OpenStreetMap.
+        </div>
+
+        {attachLocation ? (
+          <div className="mt-3 rounded-2xl ring-1 ring-slate-200/70 dark:ring-white/[0.12] bg-white/80 dark:bg-slate-950/20 p-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="text-xs text-slate-600 dark:text-slate-300">
+                Permission:{' '}
+                <span className="font-extrabold text-slate-900 dark:text-white">
+                  {geoPermission || 'unknown'}
+                </span>
+                {geoPermission === 'denied' ? (
+                  <span className="ml-2 text-rose-600 dark:text-rose-300 font-semibold">
+                    Enable location access in your browser settings to attach it.
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => refreshLocationPreview()}
+                  disabled={locationBusy || isSubmitting}
+                  className="rounded-xl px-3 py-1.5 text-xs font-extrabold text-slate-800 dark:text-slate-100 bg-white/90 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-900/55 ring-1 ring-black/5 dark:ring-white/[0.12] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {locationBusy ? 'Getting location…' : locationPreview ? 'Update location' : 'Preview location'}
+                </button>
+                {/* Clear removed per request */}
+              </div>
+            </div>
+
+            {locationError ? <div className="mt-2 text-xs font-semibold text-rose-600 dark:text-rose-300">{locationError}</div> : null}
+
+            {locationPreview ? (
+              <div className="mt-3 space-y-2">
+                <div className="text-xs text-slate-600 dark:text-slate-300 break-words">
+                  <span className="font-bold text-slate-900 dark:text-white">Saved preview:</span>{' '}
+                  {locationPreview.address ? (
+                    <span>{locationPreview.address}</span>
+                  ) : (
+                    <span className="font-semibold">
+                      {Number(locationPreview.lat).toFixed(6)}, {Number(locationPreview.lng).toFixed(6)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span className="font-semibold tabular-nums">
+                    {Number(locationPreview.lat).toFixed(6)}, {Number(locationPreview.lng).toFixed(6)}
+                  </span>
+                  {Number.isFinite(Number(locationPreview.accuracy)) ? (
+                    <span className="font-semibold tabular-nums">±{Math.round(Number(locationPreview.accuracy))}m</span>
+                  ) : null}
+                  {locationPreview.capturedAt ? <span>{new Date(locationPreview.capturedAt).toLocaleString()}</span> : null}
+                </div>
+                {osmEmbedUrl ? (
+                  <div className="relative mt-2 overflow-hidden rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.12] bg-slate-50 dark:bg-slate-900/30">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await refreshLocationPreview();
+                        setMapNonce(Date.now());
+                      }}
+                      disabled={locationBusy || isSubmitting || geoPermission === 'denied'}
+                      className="absolute top-2 left-2 z-10 rounded-xl px-3 py-1.5 text-xs font-extrabold text-slate-800 dark:text-slate-100 bg-white/95 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-900/85 ring-1 ring-black/10 dark:ring-white/[0.14] shadow-sm backdrop-blur disabled:opacity-60 disabled:cursor-not-allowed"
+                      title="Center the map on your current location"
+                    >
+                      Recenter
+                    </button>
+                    <iframe
+                      title="Location map preview"
+                      src={osmEmbedUrl}
+                      className="block w-full h-44 bg-white dark:bg-slate-950"
+                      style={{ border: 0 }}
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                    <div className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between gap-2">
+                      <span>Map: OpenStreetMap</span>
+                      <a
+                        href={`https://www.openstreetmap.org/?mlat=${encodeURIComponent(locationPreview.lat)}&mlon=${encodeURIComponent(locationPreview.lng)}#map=18/${encodeURIComponent(locationPreview.lat)}/${encodeURIComponent(locationPreview.lng)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-bold text-blue-700 dark:text-blue-200 hover:underline"
+                      >
+                        Open
+                      </a>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                Tip: click “Preview location” once. On save, the latest location will be attached.
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
       
       {/* Show the transaction ID when editing (for debugging) */}

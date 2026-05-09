@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 
 type Slice = { name: string; value: number; color: string };

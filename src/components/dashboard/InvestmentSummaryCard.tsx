@@ -1,5 +1,5 @@
 import React from 'react';
-import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useDelayedCountUp } from '../../hooks/useDelayedCountUp';
 
@@ -47,6 +47,7 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
   const [showDot, setShowDot] = React.useState(false);
   const chartAnimationMs = durationMs;
   const chartKey = phase === 'loading' ? 'loading' : 'counting';
+  const fillId = React.useId();
 
   const data = React.useMemo(() => {
     const clean = (series || []).map((n) => (Number.isFinite(Number(n)) ? Number(n) : 0));
@@ -54,6 +55,25 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
     const lastIdx = Math.max(0, trimmed.length - 1);
     return trimmed.map((v, idx) => ({ v, idx, lastIdx })) as Array<Point & { lastIdx: number }>;
   }, [series]);
+
+  const { domain, isUp } = React.useMemo(() => {
+    const vals = data.map((p) => Number(p?.v) || 0);
+    const min = vals.length ? Math.min(...vals) : 0;
+    const max = vals.length ? Math.max(...vals) : 0;
+    const span = Math.max(0, max - min);
+
+    // Add extra padding so small moves still look like moves.
+    const pad = Math.max(span * 0.28, Math.max(1, Math.abs(max) * 0.02));
+    const lo = min - pad;
+    const hi = max + pad;
+
+    const first = vals[0] ?? 0;
+    const last = vals[vals.length - 1] ?? 0;
+    return { domain: [lo, hi] as [number, number], isUp: last >= first };
+  }, [data]);
+
+  const stroke = isUp ? '#7C3AED' : '#F97316';
+  const gridStroke = 'rgba(15,23,42,0.08)';
 
   React.useEffect(() => {
     setShowDot(false);
@@ -89,18 +109,21 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart key={chartKey} data={data} margin={{ top: 10, right: 6, bottom: 0, left: 0 }}>
                   <defs>
-                    <linearGradient id="invFillCompact" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.14} />
-                      <stop offset="100%" stopColor="#7C3AED" stopOpacity={0.0} />
+                    <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={stroke} stopOpacity={0.18} />
+                      <stop offset="80%" stopColor={stroke} stopOpacity={0.06} />
+                      <stop offset="100%" stopColor={stroke} stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <Tooltip content={<EmptyTooltip />} />
+                  <CartesianGrid vertical={false} stroke={gridStroke} strokeDasharray="3 4" />
+                  <YAxis hide domain={domain} />
                   <Area
                     type="monotone"
                     dataKey="v"
-                    stroke="#7C3AED"
-                    strokeWidth={2}
-                    fill="url(#invFillCompact)"
+                    stroke={stroke}
+                    strokeWidth={2.25}
+                    fill={`url(#${fillId})`}
                     fillOpacity={1}
                     isAnimationActive
                     animationDuration={chartAnimationMs}
@@ -109,7 +132,7 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
                     dot={(p: any) => {
                       if (!p?.payload || p.payload.idx !== p.payload.lastIdx) return null;
                       if (!showDot) return null;
-                      return <circle cx={p.cx} cy={p.cy} r="3.5" fill="#7C3AED" stroke="#FFFFFF" strokeWidth="2" />;
+                      return <circle cx={p.cx} cy={p.cy} r="3.6" fill={stroke} stroke="#FFFFFF" strokeWidth="2" />;
                     }}
                     activeDot={false as any}
                   />
