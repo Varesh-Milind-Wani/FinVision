@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useExpenseContext } from '../contexts/ExpenseContext';
 import { useAmountsVisibility } from '../contexts/AmountsVisibilityContext';
@@ -58,11 +58,37 @@ const ExportImport = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
+  const escapeHtml = (value) =>
+    String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
   const escapeCsv = (value) => {
     const s = value == null ? '' : String(value);
     if (!/[",\n\r]/.test(s)) return s;
     return `"${s.replace(/"/g, '""')}"`;
   };
+
+  const buildJsonBackup = () => ({
+    schema: BACKUP_SCHEMA,
+    exportedAt: new Date().toISOString(),
+    app: { name: 'FinVision', origin: typeof window !== 'undefined' ? window.location.origin : '' },
+    localStorage: collectBackupStorage(),
+    summary: {
+      transactions: (transactions || []).length,
+      categories: (categories || []).length,
+    },
+    legacy: {
+      transactions,
+      categories,
+      currencyCode,
+      networthSnapshots,
+      dashboardPrefs,
+    },
+  });
 
   const parseCsv = (text) => {
     const input = String(text || '');
@@ -148,7 +174,7 @@ const ExportImport = () => {
     if (typeof value === 'number') return value;
     const text = String(value || '')
       .trim()
-      .replace(/[₹$,A-Z]/gi, '')
+      .replace(/[â‚¹$,A-Z]/gi, '')
       .replace(/,/g, '')
       .replace(/[^\d.-]/g, '');
     const n = parseFloat(text);
@@ -189,101 +215,139 @@ const ExportImport = () => {
         }
       }
 
-      const dataToExport =
-        format === 'json'
-          ? {
-              schema: BACKUP_SCHEMA,
-              exportedAt: new Date().toISOString(),
-              app: { name: 'FinVision', origin: typeof window !== 'undefined' ? window.location.origin : '' },
-              localStorage: collectBackupStorage(),
-              summary: {
-                transactions: (transactions || []).length,
-                categories: (categories || []).length,
-              },
-              legacy: {
-                transactions,
-                categories,
-                currencyCode,
-                networthSnapshots,
-                dashboardPrefs,
-              },
-            }
-          : {
-              transactions,
-              categories,
-              currencyCode,
-              networthSnapshots,
-              dashboardPrefs,
-              exportDate: new Date().toISOString(),
-            };
+      // Transactions-only export (flat table). Investment-specific fields are included as extra columns.
+      const header = [
+        'Date',
+        'Description',
+        'Category',
+        'Amount',
+        'Type',
+        'Quantity',
+        'EntryPrice',
+        'ExitPrice',
+        'CurrentPrice',
+        'LocationAddress',
+      ];
 
-      let content;
-      let filename;
-      let contentType;
+      const rows = (transactions || []).map((transaction) => {
+        const isInvestment = transaction?.type === 'investment';
+        const quantity = isInvestment ? transaction?.quantity : '';
+        const entryPrice = isInvestment ? transaction?.entryPrice : '';
+        const exitPrice = isInvestment ? transaction?.exitPrice : '';
+        const currentPrice = isInvestment ? transaction?.currentPrice : '';
 
-      if (format === 'json') {
-        content = JSON.stringify(dataToExport, null, 2);
-        filename = `expense-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
-        contentType = 'application/json';
-      } else if (format === 'csv') {
-        // CSV is transactions-only (flat table). Investment-specific fields are included as extra columns.
-        const csvHeader =
-          'Date,Description,Category,Amount,Type,Quantity,EntryPrice,ExitPrice,CurrentPrice,LocationLat,LocationLng,LocationAccuracy,LocationAddress,LocationCapturedAt\n';
+        const loc = transaction?.location && typeof transaction.location === 'object' ? transaction.location : null;
+        const locAddr = loc?.address ?? '';
 
-        const csvRows = (transactions || [])
-          .map((transaction) => {
-            const isInvestment = transaction?.type === 'investment';
-            const quantity = isInvestment ? transaction?.quantity : '';
-            const entryPrice = isInvestment ? transaction?.entryPrice : '';
-            const exitPrice = isInvestment ? transaction?.exitPrice : '';
-            const currentPrice = isInvestment ? transaction?.currentPrice : '';
+        return [
+          transaction?.date || '',
+          transaction?.description || '',
+          transaction?.category || '',
+          transaction?.amount ?? '',
+          transaction?.type || '',
+          quantity ?? '',
+          entryPrice ?? '',
+          exitPrice ?? '',
+          currentPrice ?? '',
+          locAddr ?? '',
+        ];
+      });
 
-            const loc = transaction?.location && typeof transaction.location === 'object' ? transaction.location : null;
-            const locLat = loc?.lat ?? '';
-            const locLng = loc?.lng ?? '';
-            const locAcc = loc?.accuracy ?? '';
-            const locAddr = loc?.address ?? '';
-            const locCapturedAt = loc?.capturedAt ?? '';
+      const today = new Date().toISOString().split('T')[0];
+      const totalSpend = Math.round(
+        (transactions || []).reduce((sum, t) => {
+          const isExpense = String(t?.type || '').toLowerCase() === 'expense';
+          if (!isExpense) return sum;
+          const n = typeof t?.amount === 'number' ? t.amount : Number(t?.amount);
+          if (!Number.isFinite(n)) return sum;
+          return sum + Math.abs(n);
+        }, 0) * 100
+      ) / 100;
+      const spendLabel = currencyCode ? `${totalSpend} ${currencyCode}` : String(totalSpend);
 
-            const cols = [
-              transaction?.date || '',
-              transaction?.description || '',
-              transaction?.category || '',
-              transaction?.amount ?? '',
-              transaction?.type || '',
-              quantity ?? '',
-              entryPrice ?? '',
-              exitPrice ?? '',
-              currentPrice ?? '',
-              locLat ?? '',
-              locLng ?? '',
-              locAcc ?? '',
-              locAddr ?? '',
-              locCapturedAt ?? '',
-            ];
-            return cols.map(escapeCsv).join(',');
-          })
-          .join('\n');
+      if (format === 'excel') {
+        // Export as CSV for maximum compatibility with Excel (avoids ".xls doesn't match" warnings).
+        const csvHeader = header.join(',') + '\n';
+        const csvRows = rows.map((r) => r.map(escapeCsv).join(',')).join('\n');
+        const totalsRow = ['Total Spend', spendLabel, '', '', '', '', '', '', '', '', ''].map(escapeCsv).join(',');
 
-        content = csvHeader + csvRows + (csvRows ? '\n' : '');
-        filename = `expense-tracker-export-${new Date().toISOString().split('T')[0]}.csv`;
-        contentType = 'text/csv';
+        const content = csvHeader + csvRows + (csvRows ? '\n' : '') + totalsRow + '\n';
+        const filename = `finvision-export-${today}.csv`;
+        const blob = new Blob([content], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        setImportSuccess('Excel (CSV) exported');
+        setTimeout(() => setImportSuccess(''), 2500);
+      } else if (format === 'pdf') {
+        const tableHeader = `<tr>${header.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr>`;
+        const tableRows = rows.map((r) => `<tr>${r.map((v) => `<td>${escapeHtml(v)}</td>`).join('')}</tr>`).join('');
+
+        const html =
+          `<!doctype html><html><head><meta charset="utf-8" />` +
+          `<title>FinVision Export ${today}</title>` +
+          `<style>@page{margin:16mm}body{font-family:Arial,sans-serif;color:#0f172a}h2{margin:0 0 6px}p{margin:0 0 12px;color:#475569;font-size:12px}` +
+          `table{width:100%;border-collapse:collapse}th,td{border:1px solid #e2e8f0;padding:6px;font-size:10.5px;vertical-align:top}th{background:#f1f5f9;text-align:left}` +
+          `th:nth-child(1),td:nth-child(1){min-width:86px;white-space:nowrap}` +
+          `</style></head><body>` +
+          `<h2>FinVision Export</h2><p>${today} &bull; ${rows.length} records &bull; Total Spend: <b>${escapeHtml(spendLabel)}</b></p>` +
+          `<table>${tableHeader}${tableRows}</table>` +
+          `</body></html>`;
+
+        // Use an offscreen iframe to avoid popup blockers; the user can "Save as PDF" in the print dialog.
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(iframe);
+
+        const cleanup = () => {
+          try {
+            document.body.removeChild(iframe);
+          } catch {
+            // ignore
+          }
+        };
+
+        const onLoad = () => {
+          try {
+            const w = iframe.contentWindow;
+            if (!w) throw new Error('Print frame unavailable.');
+            w.focus();
+            w.print();
+            setImportSuccess('PDF ready (print dialog)');
+            setTimeout(() => setImportSuccess(''), 2500);
+          } catch (e) {
+            cleanup();
+            throw e;
+          }
+
+          // Give the print dialog time to open before cleanup.
+          window.setTimeout(cleanup, 1500);
+        };
+
+        iframe.addEventListener('load', onLoad, { once: true });
+        const doc = iframe.contentDocument;
+        if (!doc) {
+          cleanup();
+          throw new Error('Print document unavailable.');
+        }
+        doc.open();
+        doc.write(html);
+        doc.close();
+      } else {
+        throw new Error('Unsupported export format');
       }
-
-      // Create download link
-      const blob = new Blob([content], { type: contentType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      // Show success message
-      setImportSuccess(`Data exported successfully as ${format.toUpperCase()}`);
-      setTimeout(() => setImportSuccess(''), 3000);
     } catch (error) {
       setImportError(`Export failed: ${error.message}`);
       setTimeout(() => setImportError(''), 3000);
@@ -321,7 +385,7 @@ const ExportImport = () => {
           // Full backup restore (preferred)
           if (data?.schema === BACKUP_SCHEMA && data?.localStorage && typeof data.localStorage === 'object') {
             restoreBackupStorage(data.localStorage);
-            setImportSuccess('Backup restored successfully. Reloading…');
+            setImportSuccess('Backup restored successfully. Reloadingâ€¦');
             setImportError('');
             window.setTimeout(() => window.location.reload(), 250);
             return;
@@ -507,29 +571,29 @@ const ExportImport = () => {
           </div>
           
           <p className="text-slate-600 dark:text-slate-300 mb-4">
-            Download a full backup (recommended) in JSON, or a transactions-only CSV (includes investment Quantity/EntryPrice/ExitPrice/CurrentPrice + location columns).
+            Download your transactions as Excel, or save a PDF report.
           </p>
           
-          <div className="flex space-x-3 mb-4">
+          <div className="flex flex-wrap gap-3 mb-4">
             <button 
-              onClick={() => exportData('json')} 
+              onClick={() => exportData('excel')} 
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center transition-colors shadow-soft focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               disabled={transactions.length === 0 || isExporting}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              JSON
+              Excel (CSV)
             </button>
             <button 
-              onClick={() => exportData('csv')} 
+              onClick={() => exportData('pdf')} 
               className="btn-surface disabled:opacity-70 disabled:cursor-not-allowed"
               disabled={transactions.length === 0 || isExporting}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
               </svg>
-              CSV
+              PDF
             </button>
           </div>
           
@@ -605,7 +669,7 @@ const ExportImport = () => {
               <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
                 JSON
               </span>
-              <span className="mx-2 text-xs text-slate-400" aria-hidden="true">•</span>
+              <span className="mx-2 text-xs text-slate-400" aria-hidden="true">â€¢</span>
               <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-200">
                 CSV
               </span>
@@ -620,3 +684,5 @@ const ExportImport = () => {
 };
 
 export default ExportImport; 
+
+

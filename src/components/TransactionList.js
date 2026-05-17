@@ -425,7 +425,7 @@ const TransactionItem = ({ transaction, selected, onToggleSelect, onEdit, onDele
                   }`}
                 >
                   {(() => {
-                    const sign = investmentLive.pnl >= 0 ? '+' : 'âˆ’';
+                    const sign = investmentLive.pnl >= 0 ? '+' : '−';
                     const pnlText = amountsHidden ? `${sign} ${maskedText}` : `${sign} ${formatFromBase(Math.abs(investmentLive.pnl), 'en-US')}`;
                     return `Unrealized ${pnlText}`;
                   })()}

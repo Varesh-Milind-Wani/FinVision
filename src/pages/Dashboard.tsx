@@ -21,28 +21,101 @@ import AnimatedKpiValue from '../components/dashboard/AnimatedKpiValue';
 
 const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
-const buildInvestmentSparkline = (total: number, invested: number) => {
-  const safeTotal = Math.max(0, Number.isFinite(total) ? total : 0);
-  const safeInvested = Math.max(0, Number.isFinite(invested) ? invested : 0);
-  if (safeTotal <= 0 && safeInvested <= 0) return [0, 0, 0, 0];
+const buildInvestmentSparkline = (opts: { total: number; investAmount: number; transactions: any[] }) => {
+  const safeTotal = Math.max(0, Number.isFinite(opts.total) ? opts.total : 0);
+  const safeInvested = Math.max(0, Number.isFinite(opts.investAmount) ? opts.investAmount : 0);
+  const tx = Array.isArray(opts.transactions) ? opts.transactions : [];
 
-  const end = safeTotal > 0 ? safeTotal : safeInvested;
-  const midValue = safeInvested > 0 ? safeInvested : end * 0.85;
+  if (tx.length === 0 || (safeTotal <= 0 && safeInvested <= 0)) return [0, 0, 0, 0];
 
-  const len = 12;
-  const midIdx = Math.floor(len * 0.45);
-  const start = Math.round(midValue * 0.72);
+  const byDate = new Map<string, number>();
+  for (const t of tx) {
+    const dateKey = typeof t?.date === 'string' ? t.date : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue;
 
-  return Array.from({ length: len }, (_, i) => {
-    const t = i / (len - 1);
-    const phase = i <= midIdx ? i / Math.max(1, midIdx) : (i - midIdx) / Math.max(1, len - 1 - midIdx);
-    const base = i <= midIdx ? start + (midValue - start) * phase : midValue + (end - midValue) * phase;
-    const wave = Math.sin(t * Math.PI * 2.2) * (end * 0.015) + Math.sin(t * Math.PI * 5.1) * (end * 0.006);
-    const v = Math.max(0, Math.round(base + wave));
-    if (i === len - 1) return Math.round(end);
-    if (i === midIdx) return Math.round(midValue);
-    return v;
-  });
+    const amount = Number(t?.amount);
+    if (Number.isFinite(amount) && amount > 0) {
+      byDate.set(dateKey, (byDate.get(dateKey) || 0) + amount);
+      continue;
+    }
+
+    const qty = Number(t?.quantity);
+    const entry = Number(t?.entryPrice);
+    if (Number.isFinite(qty) && qty > 0 && Number.isFinite(entry) && entry > 0) {
+      byDate.set(dateKey, (byDate.get(dateKey) || 0) + qty * entry);
+    }
+  }
+
+  // Produce a daily time series (length 120) ending today with "step" moves on transaction days.
+  const days = 120;
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const start = new Date(end);
+  start.setDate(start.getDate() - (days - 1));
+
+  // Sum flows within window to estimate how much invested existed before the window.
+  let windowFlows = 0;
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    windowFlows += Number(byDate.get(key) || 0);
+  }
+
+  const factor = safeInvested > 0 ? safeTotal / safeInvested : 1;
+  const priorInvested = Math.max(0, safeInvested - windowFlows);
+  let runningInvested = priorInvested;
+
+  const out: number[] = [];
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    runningInvested += Number(byDate.get(key) || 0);
+    out.push(Math.max(0, round2(runningInvested * factor)));
+  }
+
+  if (out.length > 0) out[out.length - 1] = safeTotal || out[out.length - 1];
+  return out;
+};
+
+const buildIncomeTrend = (transactions: any[]) => {
+  const tx = Array.isArray(transactions) ? transactions : [];
+  const daily = new Map<string, number>();
+
+  const toNum = (v: any) => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : NaN;
+  };
+
+  for (const t of tx) {
+    if (t?.type !== 'income') continue;
+    const dateKey = typeof t?.date === 'string' ? t.date : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue;
+    const amount = Math.abs(toNum(t?.amount) || 0);
+    if (!Number.isFinite(amount) || amount === 0) continue;
+    daily.set(dateKey, (daily.get(dateKey) || 0) + amount);
+  }
+
+  const maxDays = 1825;
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const start = new Date(end);
+  start.setDate(start.getDate() - (maxDays - 1));
+
+  const out: Array<{ ts: number; value: number; delta: number }> = [];
+  for (let i = 0; i < maxDays; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const key = `${y}-${m}-${day}`;
+    const v = Number(daily.get(key) || 0);
+    out.push({ ts: d.getTime(), value: v, delta: v });
+  }
+
+  return out;
 };
 
 const Dashboard = () => {
@@ -100,7 +173,7 @@ const Dashboard = () => {
       return !isClosed;
     });
     if (list.length === 0) {
-      return { total: 0, investAmount: 0, spark: buildInvestmentSparkline(0, 0) };
+      return { total: 0, investAmount: 0, spark: buildInvestmentSparkline({ total: 0, investAmount: 0, transactions: [] }) };
     }
 
     const invested = list.reduce((sum: number, t: any) => {
@@ -130,7 +203,7 @@ const Dashboard = () => {
 
     const investAmount = round2(invested);
     const total = round2(totalValue);
-    const spark = buildInvestmentSparkline(total, investAmount);
+    const spark = buildInvestmentSparkline({ total, investAmount, transactions: list });
     return { total, investAmount, spark };
   }, [transactions]);
 
@@ -179,6 +252,8 @@ const Dashboard = () => {
     ];
   }, [categories, formatFromBase, transactions]);
 
+  const incomeTrend = React.useMemo(() => buildIncomeTrend(transactions as any[]), [transactions]);
+
   return (
     <div className="min-h-0 bg-transparent">
       <main className="py-6 w-full">
@@ -210,8 +285,17 @@ const Dashboard = () => {
               }
               deltaLabel={`${monthCompare.incomeDeltaPct >= 0 ? '+' : '-'}${Math.abs(monthCompare.incomeDeltaPct).toFixed(1)}% compared to last month`}
               deltaTone={monthCompare.incomeDeltaPct >= 0 ? 'up' : 'down'}
+              deltaVariant="badge"
               iconTone="emerald"
               isLoading={incomeLoading}
+              emptyRightLabel={null}
+              modal={{
+                title: 'Income trend',
+                subtitle: 'Daily income (sum of income transactions)',
+                data: incomeTrend,
+                valueFormatter: (n) => formatFromBase(Number(n) || 0),
+                valueLabel: 'Income',
+              }}
             />
           </div>
 

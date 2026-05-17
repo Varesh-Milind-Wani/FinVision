@@ -799,12 +799,12 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
         hyperDataItems: [],
       };
 
-      const amountText = `${currency} ${formatAmountForInput(amount, { maxDecimals: 2 })}`;
-      const profitText = profit == null ? null : `${profit >= 0 ? '+' : '−'}${currency} ${formatAmountForInput(Math.abs(profit), { maxDecimals: 2 })}`;
+      const amountText = `-${currency} ${formatAmountForInput(amount, { maxDecimals: 2 })}`;
+      const profitText = profit == null ? null : `${profit >= 0 ? '+' : '-'}${currency} ${formatAmountForInput(Math.abs(profit), { maxDecimals: 2 })}`;
       const unrealizedProfitText =
         unrealizedProfit == null
           ? null
-          : `${unrealizedProfit >= 0 ? '+' : '−'}${currency} ${formatAmountForInput(Math.abs(unrealizedProfit), { maxDecimals: 2 })}`;
+          : `${unrealizedProfit >= 0 ? '+' : '-'}${currency} ${formatAmountForInput(Math.abs(unrealizedProfit), { maxDecimals: 2 })}`;
 
       return {
         payload,
@@ -847,7 +847,8 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
     const categoryName = (categoryList || []).find((c) => c.id === payload.category)?.name || payload.category || 'Category';
 
     const currency = getCurrencySymbol(currencyCode);
-    const amountText = `${currency} ${formatAmountForInput(normalizedAmount, { maxDecimals: 2 })}`;
+    const signedAmountPrefix = isIncome ? '' : '-';
+    const amountText = `${signedAmountPrefix}${currency} ${formatAmountForInput(normalizedAmount, { maxDecimals: 2 })}`;
 
     return {
       payload,
@@ -859,7 +860,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
         description: payload.description || '',
         dateText: formatDateLabel(payload.date),
         hyperDataItems,
-        hyperDataTotalText: `${currency} ${formatAmountForInput(normalizedAmount, { maxDecimals: 2 })}`,
+        hyperDataTotalText: `${signedAmountPrefix}${currency} ${formatAmountForInput(normalizedAmount, { maxDecimals: 2 })}`,
       },
     };
   };
@@ -1357,7 +1358,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
                   Entry Price
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <span className="text-gray-500 dark:text-gray-400">{getCurrencySymbol(currencyCode)}</span>
                   </div>
                   <input
@@ -1386,7 +1387,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
               Exit Price <span className="text-xs font-medium text-slate-500 dark:text-slate-400">(optional)</span>
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                 <span className="text-gray-500 dark:text-gray-400">{getCurrencySymbol(currencyCode)}</span>
               </div>
               <input
@@ -1412,7 +1413,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
                 Current Price <span className="text-xs font-medium text-slate-500 dark:text-slate-400">(optional)</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                   <span className="text-gray-500 dark:text-gray-400">{getCurrencySymbol(currencyCode)}</span>
                 </div>
                 <input
@@ -1462,7 +1463,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
               Amount <span className="text-xs font-medium text-slate-500 dark:text-slate-400">(auto)</span>
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                 <span className="text-gray-500 dark:text-gray-400">{getCurrencySymbol(currencyCode)}</span>
               </div>
               <input

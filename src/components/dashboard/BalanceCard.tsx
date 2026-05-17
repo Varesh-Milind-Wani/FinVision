@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useExpenseContext } from '../../contexts/ExpenseContext';
@@ -12,6 +12,20 @@ const BalanceCard = () => {
   const [chartOpen, setChartOpen] = useState(false);
   type RangeDays = 7 | 30 | 90 | 180 | 365 | 1095 | 1825;
   const [rangeDays, setRangeDays] = useState<RangeDays>(30);
+  const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
+  const [viewEndIndex, setViewEndIndex] = useState<number | null>(null);
+  const [yPan, setYPan] = useState(0);
+  const chartViewportRef = useRef<HTMLDivElement | null>(null);
+  const rangeMenuRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    startEndIndex: number;
+    startYPan: number;
+  } | null>(null);
+
+  const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
   const delta = useMemo(() => {
     const months = (typeof getMonthlyData === 'function' ? getMonthlyData() : []) || [];
@@ -24,7 +38,7 @@ const BalanceCard = () => {
     return { pct, positive: pct >= 0 };
   }, [getMonthlyData]);
 
-  const chartData = useMemo(() => {
+  const dailyDelta = useMemo(() => {
     const toNum = (v: any) => {
       const n = typeof v === 'number' ? v : Number(v);
       return Number.isFinite(n) ? n : NaN;
@@ -33,7 +47,7 @@ const BalanceCard = () => {
     const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
     const tx = Array.isArray(transactions) ? transactions : [];
-    const dailyDelta = new Map<string, number>();
+    const out = new Map<string, number>();
 
     for (const t of tx) {
       const dateKey = typeof t?.date === 'string' ? t.date : '';
@@ -64,16 +78,23 @@ const BalanceCard = () => {
       }
 
       if (!Number.isFinite(deltaValue) || deltaValue === 0) continue;
-      dailyDelta.set(dateKey, round2((dailyDelta.get(dateKey) || 0) + deltaValue));
+      out.set(dateKey, round2((out.get(dateKey) || 0) + deltaValue));
     }
+
+    return out;
+  }, [transactions]);
+
+  const fullChartData = useMemo(() => {
+    const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
+    const maxDays: RangeDays = 1825;
 
     const now = new Date();
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const start = new Date(end);
-    start.setDate(start.getDate() - (rangeDays - 1));
+    start.setDate(start.getDate() - (maxDays - 1));
 
     const keys: { key: string; ts: number }[] = [];
-    for (let i = 0; i < rangeDays; i += 1) {
+    for (let i = 0; i < maxDays; i += 1) {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       const y = d.getFullYear();
@@ -93,7 +114,17 @@ const BalanceCard = () => {
       running = round2(running + delta);
       return { ts: k.ts, dateKey: k.key, balance: running, delta };
     });
-  }, [netBalance, rangeDays, transactions]);
+  }, [dailyDelta, netBalance]);
+
+  const chartData = useMemo(() => {
+    const len = fullChartData.length;
+    if (!len) return [];
+    const windowSize = Math.min(rangeDays, len);
+    const defaultEnd = len - 1;
+    const end = viewEndIndex == null ? defaultEnd : clamp(viewEndIndex, windowSize - 1, defaultEnd);
+    const start = end - windowSize + 1;
+    return fullChartData.slice(start, end + 1);
+  }, [fullChartData, rangeDays, viewEndIndex]);
 
   const xTickFormatter = useMemo(() => {
     const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit' });
@@ -107,8 +138,10 @@ const BalanceCard = () => {
     const values = chartData.map((p) => Number(p?.balance)).filter((n) => Number.isFinite(n));
     if (!values.length) return ['auto', 'auto'] as const;
 
-    let min = Math.min(...values);
-    let max = Math.max(...values);
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    let min = rawMin;
+    let max = rawMax;
 
     if (min === max) {
       const pad = Math.max(1, Math.abs(min) * 0.05);
@@ -120,8 +153,17 @@ const BalanceCard = () => {
       max += pad;
     }
 
+    // Avoid showing negative/positive padding if the data never crosses zero.
+    if (rawMin >= 0) min = Math.max(0, min);
+    if (rawMax <= 0) max = Math.min(0, max);
+
+    if (yPan !== 0) {
+      min += yPan;
+      max += yPan;
+    }
+
     return [min, max] as const;
-  }, [chartData]);
+  }, [chartData, yPan]);
 
   const BalanceTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
@@ -150,11 +192,104 @@ const BalanceCard = () => {
   useEffect(() => {
     if (!chartOpen) return undefined;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setChartOpen(false);
+      if (e.key === 'Escape') {
+        if (rangeMenuOpen) setRangeMenuOpen(false);
+        else setChartOpen(false);
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [chartOpen]);
+  }, [chartOpen, rangeMenuOpen]);
+
+  useEffect(() => {
+    if (!rangeMenuOpen) return undefined;
+    const onPointerDown = (e: PointerEvent) => {
+      const el = rangeMenuRef.current;
+      if (!el) return;
+      if (e.target instanceof Node && el.contains(e.target)) return;
+      setRangeMenuOpen(false);
+    };
+    // Use bubble phase so menu item clicks aren't swallowed by an early close.
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, [rangeMenuOpen]);
+
+  useEffect(() => {
+    // When changing window size, keep the view anchored to the latest point and reset vertical pan.
+    setViewEndIndex(null);
+    setYPan(0);
+    setRangeMenuOpen(false);
+  }, [rangeDays]);
+
+  const rangeOptions: Array<{ days: RangeDays; label: string }> = [
+    { days: 7, label: '7D' },
+    { days: 30, label: '30D' },
+    { days: 90, label: '90D' },
+    { days: 180, label: '6M' },
+    { days: 365, label: '1Y' },
+    { days: 1095, label: '3Y' },
+    { days: 1825, label: '5Y' },
+  ];
+  const rangeLabel = rangeOptions.find((o) => o.days === rangeDays)?.label || `${rangeDays}D`;
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!chartViewportRef.current) return;
+    const len = fullChartData.length;
+    if (len < 2) return;
+
+    chartViewportRef.current.setPointerCapture?.(e.pointerId);
+    const windowSize = Math.min(rangeDays, len);
+    const defaultEnd = len - 1;
+    const currentEnd = viewEndIndex == null ? defaultEnd : clamp(viewEndIndex, windowSize - 1, defaultEnd);
+
+    dragRef.current = {
+      active: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      startEndIndex: currentEnd,
+      startYPan: yPan,
+    };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const state = dragRef.current;
+    const el = chartViewportRef.current;
+    if (!state?.active || !el) return;
+
+    const len = fullChartData.length;
+    if (len < 2) return;
+
+    const rect = el.getBoundingClientRect();
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
+    const dx = e.clientX - state.startX;
+    const dy = e.clientY - state.startY;
+
+    const windowSize = Math.min(rangeDays, len);
+    const minEnd = windowSize - 1;
+    const maxEnd = len - 1;
+
+    const dayShift = Math.round((-dx / w) * windowSize);
+    const nextEnd = clamp(state.startEndIndex + dayShift, minEnd, maxEnd);
+    setViewEndIndex(nextEnd === maxEnd ? null : nextEnd);
+
+    const y0 = Number((yDomain as any)?.[0]);
+    const y1 = Number((yDomain as any)?.[1]);
+    const range = Number.isFinite(y0) && Number.isFinite(y1) ? Math.max(1, Math.abs(y1 - y0)) : 1;
+    const yShift = (dy / h) * range;
+    setYPan(state.startYPan + yShift);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = chartViewportRef.current;
+    try {
+      el?.releasePointerCapture?.(e.pointerId);
+    } catch {
+      // noop
+    }
+    dragRef.current = null;
+  };
 
   return (
     <div className="kpi-card">
@@ -184,13 +319,39 @@ const BalanceCard = () => {
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-end">
+      <div className="mt-2 flex items-center justify-start">
         {isLoading ? (
           <span className="chip bg-slate-100 text-slate-500 ring-black/5">Loading</span>
         ) : (
-          <span className={`chip ${delta.positive ? 'chip-good' : 'chip-bad'}`}>
-            {delta.pct >= 0 ? '+' : '-'}
-            {Math.abs(delta.pct).toFixed(1)}%
+          <span
+            className={[
+              'inline-flex items-center gap-2 rounded-2xl px-3 py-2 ring-1 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.55)]',
+              delta.positive ? 'bg-emerald-50/80 text-emerald-800 ring-emerald-200/70' : 'bg-rose-50/80 text-rose-800 ring-rose-200/70',
+            ].join(' ')}
+            aria-label="Compared to previous month"
+          >
+            <span
+              className={[
+                'grid h-6 w-6 place-items-center rounded-xl text-white ring-1',
+                delta.positive ? 'bg-emerald-600 ring-emerald-500/40' : 'bg-rose-600 ring-rose-500/40',
+              ].join(' ')}
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4">
+                {delta.positive ? (
+                  <path fill="currentColor" d="M7 14l5-5 5 5 1.4-1.4-6.4-6.4-6.4 6.4L7 14z" />
+                ) : (
+                  <path fill="currentColor" d="M7 10l5 5 5-5 1.4 1.4-6.4 6.4-6.4-6.4L7 10z" />
+                )}
+              </svg>
+            </span>
+            <span className="flex flex-col leading-tight">
+              <span className="text-[12px] font-extrabold tracking-tight">
+                {delta.pct >= 0 ? '+' : '−'}
+                {Math.abs(delta.pct).toFixed(1)}%
+              </span>
+              <span className="text-[10px] font-semibold opacity-80">Compared to previous month</span>
+            </span>
           </span>
         )}
       </div>
@@ -231,68 +392,104 @@ const BalanceCard = () => {
                   <div className="px-3 sm:px-5 py-4 flex-1 min-h-0 flex flex-col">
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <div className="text-[12px] font-semibold text-slate-700">Range</div>
-                      <div className="flex items-center gap-2">
-                        {([7, 30, 90, 180, 365, 1095, 1825] as RangeDays[]).map((d) => (
-                          <button
-                            key={d}
-                            type="button"
-                            onClick={() => setRangeDays(d)}
-                            className={[
-                              'h-8 px-3 rounded-full text-[12px] font-semibold ring-1 transition-colors',
-                              rangeDays === d
-                                ? 'bg-blue-600 text-white ring-blue-500/30'
-                                : 'bg-white/70 text-slate-700 ring-black/5 hover:bg-white',
-                            ].join(' ')}
+                      <div className="relative" ref={rangeMenuRef}>
+                        <button
+                          type="button"
+                          onClick={() => setRangeMenuOpen((v) => !v)}
+                          className="h-9 px-3 rounded-full bg-white/80 text-slate-800 ring-1 ring-black/5 hover:bg-white transition-colors text-[12px] font-semibold inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                          aria-haspopup="menu"
+                          aria-expanded={rangeMenuOpen}
+                        >
+                          {rangeLabel}
+                          <svg viewBox="0 0 24 24" className="h-4 w-4 text-slate-500" aria-hidden="true">
+                            <path fill="currentColor" d="M7 10l5 5 5-5 1.4 1.4-6.4 6.4-6.4-6.4L7 10z" />
+                          </svg>
+                        </button>
+
+                        {rangeMenuOpen ? (
+                          <div
+                            role="menu"
+                            className="absolute right-0 mt-2 w-36 overflow-hidden rounded-2xl bg-white ring-1 ring-black/10 shadow-[0_20px_44px_-30px_rgba(15,23,42,0.65)] z-50"
                           >
-                            {d === 180 ? '6M' : d === 365 ? '1Y' : d === 1095 ? '3Y' : d === 1825 ? '5Y' : `${d}D`}
-                          </button>
-                        ))}
+                            {rangeOptions.map((o) => (
+                              <button
+                                key={o.days}
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setRangeDays(o.days);
+                                  setRangeMenuOpen(false);
+                                }}
+                                className={[
+                                  'w-full px-3 py-2 text-left text-[12px] font-semibold transition-colors',
+                                  o.days === rangeDays ? 'bg-slate-950 text-white' : 'text-slate-700 hover:bg-slate-50',
+                                ].join(' ')}
+                              >
+                                {o.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
 
                     <div className="flex-1 min-h-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData} margin={{ top: 10, right: 18, bottom: 8, left: 12 }}>
-                          <defs>
-                            <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#2563eb" stopOpacity={0.22} />
-                              <stop offset="100%" stopColor="#2563eb" stopOpacity={0.02} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.06)" />
-                          <XAxis
-                            dataKey="ts"
-                            type="number"
-                            domain={['dataMin', 'dataMax']}
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fontSize: 11, fill: '#64748b' }}
-                            dy={8}
-                            tickFormatter={xTickFormatter as any}
-                            tickMargin={8}
-                            interval="preserveStartEnd"
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fontSize: 11, fill: '#64748b' }}
-                            tickFormatter={(v) => formatFromBase(Number(v) || 0)}
-                            width={84}
-                            domain={yDomain as any}
-                          />
-                          <ReferenceLine y={0} stroke="rgba(15,23,42,0.10)" strokeDasharray="3 3" />
-                          <Tooltip content={<BalanceTooltip />} cursor={{ stroke: 'rgba(37,99,235,0.25)', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                          <Area
-                            type="monotone"
-                            dataKey="balance"
-                            stroke="#2563eb"
-                            strokeWidth={2.6}
-                            fill="url(#balanceFill)"
-                            dot={false}
-                            activeDot={{ r: 4.5, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
+                      <div
+                        ref={chartViewportRef}
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onPointerCancel={handlePointerUp}
+                        onPointerLeave={handlePointerUp}
+                        className="relative h-full w-full select-none touch-none cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden outline-none border-0 ring-0"
+                        aria-label="Drag to pan"
+                      >
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartData} margin={{ top: 10, right: 18, bottom: 8, left: 12 }}>
+                            <defs>
+                              <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#2563eb" stopOpacity={0.22} />
+                                <stop offset="100%" stopColor="#2563eb" stopOpacity={0.02} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.06)" />
+                            <XAxis
+                              dataKey="ts"
+                              type="number"
+                              domain={['dataMin', 'dataMax']}
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 11, fill: '#64748b' }}
+                              dy={8}
+                              tickFormatter={xTickFormatter as any}
+                              tickMargin={8}
+                              interval="preserveStartEnd"
+                            />
+                            <YAxis
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 11, fill: '#64748b' }}
+                              tickFormatter={(v) => formatFromBase(Number(v) || 0)}
+                              width={84}
+                              domain={yDomain as any}
+                            />
+                            <ReferenceLine y={0} stroke="rgba(15,23,42,0.10)" strokeDasharray="3 3" />
+                            <Tooltip
+                              content={<BalanceTooltip />}
+                              cursor={{ stroke: 'rgba(37,99,235,0.25)', strokeWidth: 1, strokeDasharray: '3 3' }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="balance"
+                              stroke="#2563eb"
+                              strokeWidth={2.6}
+                              fill="url(#balanceFill)"
+                              dot={false}
+                              activeDot={{ r: 4.5, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
                 </div>
