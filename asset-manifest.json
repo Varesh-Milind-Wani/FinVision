@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/FinVision/static/css/main.217351d3.css",
-    "main.js": "/FinVision/static/js/main.b4a1fd97.js",
+    "main.css": "/FinVision/static/css/main.c9854294.css",
+    "main.js": "/FinVision/static/js/main.f8dc1251.js",
     "static/js/472.5d46935e.chunk.js": "/FinVision/static/js/472.5d46935e.chunk.js",
     "static/js/777.39674cf5.chunk.js": "/FinVision/static/js/777.39674cf5.chunk.js",
     "static/js/117.12663487.chunk.js": "/FinVision/static/js/117.12663487.chunk.js",
@@ -10,23 +10,23 @@
     "static/js/604.56c20ca5.chunk.js": "/FinVision/static/js/604.56c20ca5.chunk.js",
     "static/js/45.c132f9cf.chunk.js": "/FinVision/static/js/45.c132f9cf.chunk.js",
     "static/js/510.ea15424f.chunk.js": "/FinVision/static/js/510.ea15424f.chunk.js",
-    "static/js/34.22bd0102.chunk.js": "/FinVision/static/js/34.22bd0102.chunk.js",
-    "static/js/842.44d0aa25.chunk.js": "/FinVision/static/js/842.44d0aa25.chunk.js",
+    "static/js/136.5081e428.chunk.js": "/FinVision/static/js/136.5081e428.chunk.js",
+    "static/js/842.00db04d6.chunk.js": "/FinVision/static/js/842.00db04d6.chunk.js",
     "static/js/468.a3cca0b0.chunk.js": "/FinVision/static/js/468.a3cca0b0.chunk.js",
     "static/js/73.0edd6fb7.chunk.js": "/FinVision/static/js/73.0edd6fb7.chunk.js",
-    "static/js/199.b244e1b3.chunk.js": "/FinVision/static/js/199.b244e1b3.chunk.js",
-    "static/js/560.c1a88f8f.chunk.js": "/FinVision/static/js/560.c1a88f8f.chunk.js",
+    "static/js/199.ec0b16b9.chunk.js": "/FinVision/static/js/199.ec0b16b9.chunk.js",
+    "static/js/560.271bc76c.chunk.js": "/FinVision/static/js/560.271bc76c.chunk.js",
     "static/js/223.c50c9a32.chunk.js": "/FinVision/static/js/223.c50c9a32.chunk.js",
     "static/js/183.053cdbf9.chunk.js": "/FinVision/static/js/183.053cdbf9.chunk.js",
     "static/js/478.bfed0810.chunk.js": "/FinVision/static/js/478.bfed0810.chunk.js",
     "static/js/206.c74a15ff.chunk.js": "/FinVision/static/js/206.c74a15ff.chunk.js",
     "static/js/187.920844ef.chunk.js": "/FinVision/static/js/187.920844ef.chunk.js",
-    "static/js/240.e66e9f46.chunk.js": "/FinVision/static/js/240.e66e9f46.chunk.js",
+    "static/js/747.86394bfb.chunk.js": "/FinVision/static/js/747.86394bfb.chunk.js",
     "index.html": "/FinVision/index.html",
     "static/media/finvision-mark.svg": "/FinVision/static/media/finvision-mark.ea65be45930babee0445822cee242ddd.svg"
   },
   "entrypoints": [
-    "static/css/main.217351d3.css",
-    "static/js/main.b4a1fd97.js"
+    "static/css/main.c9854294.css",
+    "static/js/main.f8dc1251.js"
   ]
 }
