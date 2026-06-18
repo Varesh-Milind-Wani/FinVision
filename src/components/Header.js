@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../contexts/AuthContext';
 import finvisionMark from '../assets/finvision-mark.svg';
@@ -149,6 +149,7 @@ const CapsuleNav = ({ navItems, activeTab, onNavigate, onPreload, size = 'md' })
 const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
   const { currentUser, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeTimerRef = useRef(0);
   const initials = useMemo(() => {
     const name = String(currentUser?.name || 'User').trim();
     return name
@@ -159,6 +160,13 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
   }, [currentUser?.name]);
 
   useBodyScrollLock(menuOpen);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = 0;
+    };
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -180,31 +188,72 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
     []
   );
 
-  const mobileMenu = menuOpen
-    ? createPortal(
-        <div className="fixed inset-0 z-[10010] md:hidden">
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
-            onClick={() => setMenuOpen(false)}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Navigation menu"
-            className="absolute right-0 top-0 h-full w-[min(360px,92vw)] bg-white/90 dark:bg-slate-950/80 backdrop-blur-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/[0.12]"
-            style={{
-              paddingTop: 'calc(1rem + var(--safe-area-inset-top))',
-              paddingBottom: 'calc(1rem + var(--safe-area-inset-bottom))',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+  const navigateFromMenu = useCallback(
+    (tab) => {
+      // Close immediately so the UI feels instant, then navigate on the next tick.
+      setMenuOpen(false);
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = window.setTimeout(() => {
+        startTransition(() => onNavigate?.(tab));
+      }, 0);
+    },
+    [onNavigate]
+  );
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+
+    // Warm up route chunks/components for faster tap navigation on mobile.
+    const preload = () => {
+      try {
+        navItems.forEach((i) => onPreload?.(i.id));
+        onPreload?.('settings');
+      } catch {
+        // ignore
+      }
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(preload, { timeout: 800 });
+      return () => window.cancelIdleCallback?.(id);
+    }
+
+    const t = window.setTimeout(preload, 120);
+    return () => window.clearTimeout(t);
+  }, [menuOpen, navItems, onPreload]);
+
+  const mobileMenu = createPortal(
+    <div className={`fixed inset-0 z-[10010] md:hidden ${menuOpen ? '' : 'pointer-events-none'}`}>
+      <div
+        aria-hidden="true"
+        className={[
+          'absolute inset-0 bg-slate-950/55',
+          'transition-opacity duration-200 ease-out motion-reduce:transition-none',
+          menuOpen ? 'opacity-100' : 'opacity-0',
+        ].join(' ')}
+        onClick={() => setMenuOpen(false)}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+        className={[
+          'absolute right-0 top-0 h-full w-[min(360px,92vw)]',
+          'bg-white dark:bg-slate-950 shadow-2xl ring-1 ring-black/10 dark:ring-white/[0.12]',
+          'transition-transform duration-200 ease-out motion-reduce:transition-none will-change-transform',
+          menuOpen ? 'translate-x-0' : 'translate-x-full',
+        ].join(' ')}
+        style={{
+          paddingTop: 'calc(1rem + var(--safe-area-inset-top))',
+          paddingBottom: 'calc(1rem + var(--safe-area-inset-bottom))',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
             <div className="px-4 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => {
-                  onNavigate?.('settings');
-                  setMenuOpen(false);
+                  navigateFromMenu('settings');
                 }}
                 className="flex items-center gap-3 min-w-0 text-left rounded-2xl p-2 -ml-2 hover:bg-white/60 dark:hover:bg-slate-900/35 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 aria-label="Open settings"
@@ -239,10 +288,10 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
                       key={item.id}
                       type="button"
                       onClick={() => {
-                        onNavigate?.(item.id);
-                        setMenuOpen(false);
+                        navigateFromMenu(item.id);
                       }}
                       onMouseEnter={() => onPreload?.(item.id)}
+                      onTouchStart={() => onPreload?.(item.id)}
                       className={[
                         'w-full text-left px-4 py-3 flex items-center justify-between gap-3',
                         'transition-colors',
@@ -267,8 +316,7 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
               <button
                 type="button"
                 onClick={() => {
-                  onNavigate?.('settings');
-                  setMenuOpen(false);
+                  navigateFromMenu('settings');
                 }}
                 className="px-4 py-3 rounded-2xl text-sm font-extrabold ring-1 ring-black/5 dark:ring-white/[0.12] bg-white/70 dark:bg-slate-950/25 hover:bg-white dark:hover:bg-slate-950/35 transition-colors"
               >
@@ -286,11 +334,10 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
               </button>
             </div>
 
-          </div>
-        </div>,
-        document.body
-      )
-    : null;
+      </div>
+    </div>,
+    document.body
+  );
 
   return (
     <header className="fixed inset-x-0 top-0 z-30 border-b border-black/[0.06] bg-white/70 supports-[backdrop-filter]:bg-white/55 backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150 ring-1 ring-black/[0.04] shadow-[0_14px_40px_-28px_rgba(15,23,42,0.45)] transition-colors duration-200">

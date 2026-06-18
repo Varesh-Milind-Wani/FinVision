@@ -250,7 +250,7 @@ const Networth = () => {
       });
     }, 450);
     return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [isPlaying, monthKeys.length]);
 
   const series = useMemo(() => {

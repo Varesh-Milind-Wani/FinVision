@@ -7,6 +7,8 @@ type TransactionLike = {
   category?: string;
 };
 
+type Confidence = 'High' | 'Medium' | 'Low';
+
 function TrendIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -19,13 +21,7 @@ function TrendIcon() {
 function CalendarIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M7 3v2M17 3v2M4.5 8.5h15"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M7 3v2M17 3v2M4.5 8.5h15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       <path
         d="M6.5 5h11c1.12 0 1.68 0 2.108.218.377.192.684.499.876.876.218.428.218.988.218 2.108v9.6c0 1.12 0 1.68-.218 2.108-.192.377-.499.684-.876.876-.428.218-.988.218-2.108.218h-11c-1.12 0-1.68 0-2.108-.218-.377-.192-.684-.499-.876-.876C4 19.48 4 18.92 4 17.8V8.2c0-1.12 0-1.68.218-2.108.192-.377.499-.684.876-.876C5.52 5 6.08 5 7.2 5z"
         stroke="currentColor"
@@ -51,6 +47,26 @@ function Sparkline({ series }: { series: number[] }) {
     </div>
   );
 }
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+function Meter({ value01 }: { value01: number }) {
+  const v = clamp01(value01);
+  return (
+    <div className="mt-2 h-2 rounded-full bg-slate-200/60 dark:bg-white/10 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden">
+      <div className="h-full rounded-full bg-gradient-to-r from-indigo-500/25 to-indigo-500/60" style={{ width: `${Math.round(v * 100)}%` }} />
+    </div>
+  );
+}
+
+const titleCase = (raw: string) =>
+  raw
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0]?.toUpperCase() + w.slice(1))
+    .join(' ');
 
 export default function AIForecastCard({
   transactions,
@@ -98,36 +114,46 @@ export default function AIForecastCard({
 
     const last7Series = daily.slice(7);
     const activeDays14 = daily.filter((v) => v > 0).length;
-    const confidence = activeDays14 >= 8 ? 'High' : activeDays14 >= 4 ? 'Medium' : 'Low';
+    const confidence: Confidence = activeDays14 >= 8 ? 'High' : activeDays14 >= 4 ? 'Medium' : 'Low';
 
-    return {
-      last7,
-      projectedNext7,
-      trendPct,
-      topCat,
-      last7Series,
-      confidence,
-    };
+    return { last7, projectedNext7, trendPct, topCat, last7Series, confidence, activeDays14 };
   }, [transactions]);
 
   const trendTone = forecast.trendPct >= 12 ? 'chip-warn' : forecast.trendPct <= -12 ? 'chip-good' : 'chip';
+  const confidenceTone = forecast.confidence === 'High' ? 'chip-good' : forecast.confidence === 'Medium' ? 'chip-warn' : 'chip-bad';
+  const prettyTopCat = forecast.topCat?.id ? titleCase(String(forecast.topCat.id)) : '—';
+  const fmtPct = (n: number) => `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(0)}%`;
+  const projectedRounded = Math.max(0, Math.round(forecast.projectedNext7));
+  const last7Rounded = Math.max(0, Math.round(forecast.last7));
 
   return (
     <div className="surface surface-pad-sm surface-pressable">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[13px] font-semibold text-slate-950">AI Forecast</div>
+          <div className="flex items-center gap-2">
+            <div className="text-[13px] font-semibold text-slate-950">AI Forecast</div>
+            <span className="chip bg-gradient-to-r from-indigo-500/15 to-sky-500/15 text-slate-800 ring-indigo-500/20 dark:text-slate-100">AI</span>
+          </div>
           <div className="mt-1 text-[12px] text-slate-600">Next 7 days estimate based on your last 14 days</div>
         </div>
-        <div className={`chip ${trendTone}`}>Confidence: {forecast.confidence}</div>
+        <div className="flex items-center gap-2">
+          <div className={`chip ${trendTone}`} title="Week-over-week spend direction">
+            Trend: {fmtPct(forecast.trendPct)}
+          </div>
+          <div className={`chip ${confidenceTone}`} title="Confidence increases when there are more active spending days in your last 14 days.">
+            Confidence: {forecast.confidence}
+          </div>
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="tile tile-pad flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="text-[12px] font-semibold text-slate-700">Projected spend (7d)</div>
-            <div className="mt-2 text-[18px] font-extrabold text-slate-950">{formatAmount(Math.round(forecast.projectedNext7))}</div>
-            <div className="mt-1 text-[11px] text-slate-500">Last 7 days: {formatAmount(Math.round(forecast.last7))}</div>
+            <div className="mt-2 text-[16px] font-extrabold text-slate-950 tracking-tight tabular-nums">{formatAmount(projectedRounded)}</div>
+            <div className="mt-1 text-[11px] text-slate-500">Last 7 days: {formatAmount(last7Rounded)}</div>
+            <Meter value01={forecast.activeDays14 / 14} />
+            <div className="mt-1 text-[10px] font-semibold text-slate-500">Data coverage: {forecast.activeDays14}/14 active days</div>
           </div>
           <div className="h-9 w-9 rounded-2xl ring-1 ring-indigo-100 bg-indigo-50 text-indigo-700 grid place-items-center shrink-0">
             <CalendarIcon />
@@ -137,11 +163,12 @@ export default function AIForecastCard({
         <div className="tile tile-pad flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="text-[12px] font-semibold text-slate-700">Weekly trend</div>
-            <div className="mt-2 text-[18px] font-extrabold text-slate-950">
-              {forecast.trendPct >= 0 ? '+' : '-'}
-              {Math.abs(forecast.trendPct).toFixed(0)}%
-            </div>
+            <div className="mt-2 text-[16px] font-extrabold text-slate-950 tracking-tight tabular-nums">{fmtPct(forecast.trendPct)}</div>
             <div className="mt-1 text-[11px] text-slate-500">Compared to the previous 7 days</div>
+            <div className="mt-2 flex items-center gap-2">
+              <span className={`chip ${trendTone}`}>WoW</span>
+              <span className="chip">Last 7 days</span>
+            </div>
           </div>
           <div className="h-9 w-9 rounded-2xl ring-1 ring-sky-100 bg-sky-50 text-sky-700 grid place-items-center shrink-0">
             <TrendIcon />
@@ -153,8 +180,7 @@ export default function AIForecastCard({
             <div className="min-w-0">
               <div className="text-[12px] font-semibold text-slate-700">Recent activity</div>
               <div className="mt-1 text-[11px] text-slate-500">
-                Top category:{' '}
-                <span className="font-semibold text-slate-700">{forecast.topCat ? forecast.topCat.id : '—'}</span>
+                Top category: <span className="font-semibold text-slate-700">{prettyTopCat}</span>
               </div>
             </div>
             <div className="chip">Last 7 days</div>
@@ -162,9 +188,9 @@ export default function AIForecastCard({
           <div className="mt-3">
             <Sparkline series={forecast.last7Series} />
           </div>
+          <div className="mt-2 text-[10px] font-semibold text-slate-500">Bars show spend distribution across the last 7 days</div>
         </div>
       </div>
     </div>
   );
 }
-

@@ -11,8 +11,18 @@ export type Transaction = {
   quantity?: number;
   entryPrice?: number;
   exitPrice?: number;
+  currentPrice?: number | null;
   profit?: number;
+  unrealizedProfit?: number | null;
   status?: 'active' | 'closed' | string;
+  location?: {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+    address?: string;
+    capturedAt: string;
+    provider?: string;
+  };
 };
 
 export type Category = {
@@ -29,6 +39,7 @@ export type ExpenseContextValue = {
   totalIncome: number;
   totalExpenses: number;
   netBalance: number;
+  investmentUnrealizedPnL?: number;
   getMonthlyData?: () => Array<{ income: number; expense: number; ts: number; label: string }>;
 
   // Hydration / load meta (local storage keyed per user)

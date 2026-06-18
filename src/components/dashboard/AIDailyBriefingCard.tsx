@@ -1,6 +1,8 @@
-import React from 'react';
+﻿import React from 'react';
 import { useExpenseContext } from '../../contexts/ExpenseContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
+
+type Tone = 'positive' | 'warning' | 'neutral';
 
 const iconTone = {
   positive: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
@@ -89,24 +91,84 @@ function PulseIcon() {
   );
 }
 
-const parseLocalDate = (raw: unknown): Date | null => {
-  const s = String(raw || '');
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
-  return new Date(y, mo - 1, d);
+const parseTransactionDate = (raw: unknown): Date | null => {
+  if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw;
+  if (typeof raw === 'number') {
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const s = String(raw || '').trim();
+  // If the string starts with YYYY-MM-DD (optionally followed by time), treat it as a local calendar date.
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\\s])/.exec(s);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
+    return new Date(y, mo - 1, d);
+  }
+
+  const parsed = new Date(s);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+type Insight = {
+  tone: Tone;
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  meta: string;
+  chip?: { cls: string; text: string };
+  meter?: { value01: number; tone: Tone; label?: string };
+  tooltip?: string;
+};
+
+function Meter({ value01, tone, label }: { value01: number; tone: Tone; label?: string }) {
+  const v = clamp01(value01);
+  const bar =
+    tone === 'positive'
+      ? 'from-emerald-500/25 to-emerald-500/60'
+      : tone === 'warning'
+        ? 'from-amber-500/25 to-amber-500/60'
+        : 'from-indigo-500/20 to-indigo-500/55';
+  const ring =
+    tone === 'positive'
+      ? 'ring-emerald-500/15'
+      : tone === 'warning'
+        ? 'ring-amber-500/15'
+        : 'ring-indigo-500/15';
+
+  return (
+    <div className="mt-2">
+      {label ? <div className="text-[10px] font-semibold text-slate-500">{label}</div> : null}
+      <div className={`mt-1 h-2 w-full rounded-full bg-slate-200/60 dark:bg-white/10 ring-1 ${ring} overflow-hidden`}>
+        <div className={`h-full rounded-full bg-gradient-to-r ${bar}`} style={{ width: `${Math.round(v * 100)}%` }} aria-hidden="true" />
+      </div>
+    </div>
+  );
+}
 
 export default function AIDailyBriefingCard() {
   const { transactions, categories } = useExpenseContext();
   const { formatFromBase } = useCurrency();
 
-  const now = React.useMemo(() => new Date(), []);
+  const [now, setNow] = React.useState(() => new Date());
+  const [showDetails, setShowDetails] = React.useState(false);
+  React.useEffect(() => {
+    // Refresh periodically so "last 7 days / MTD" updates even without new transactions.
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    const onVis = () => {
+      if (document.visibilityState === 'visible') setNow(new Date());
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
   const todayLabel = React.useMemo(() => {
     try {
       return `Today · ${new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit' }).format(now)}`;
@@ -115,7 +177,7 @@ export default function AIDailyBriefingCard() {
     }
   }, [now]);
 
-  const insights = React.useMemo(() => {
+  const briefing = React.useMemo(() => {
     const catById = new Map<string, string>();
     for (const c of (categories as any[]) || []) {
       if (!c) continue;
@@ -129,7 +191,7 @@ export default function AIDailyBriefingCard() {
 
     for (const t of (transactions as any[]) || []) {
       if (!t) continue;
-      const dt = parseLocalDate((t as any).date);
+      const dt = parseTransactionDate((t as any).date);
       if (!dt) continue;
 
       const amount = Math.abs(Number((t as any).amount) || 0);
@@ -184,7 +246,8 @@ export default function AIDailyBriefingCard() {
       }
     }
 
-    const wowPct = spendPrev7 > 0 ? ((spend7 - spendPrev7) / spendPrev7) * 100 : 0;
+    const hasWowBaseline = spendPrev7 > 0;
+    const wowPct = hasWowBaseline ? ((spend7 - spendPrev7) / spendPrev7) * 100 : 0;
 
     const start30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
     const byCat = new Map<string, number>();
@@ -214,12 +277,15 @@ export default function AIDailyBriefingCard() {
     const variance =
       last30Amounts.length > 1 ? last30Amounts.reduce((acc, x) => acc + Math.pow(x - mean, 2), 0) / (last30Amounts.length - 1) : 0;
     const sd = Math.sqrt(Math.max(0, variance));
-    const threshold = Math.max(0, mean + 2.25 * sd);
+    const hasAnomalyModel = last30Amounts.length >= 8 && sd > 0;
+    const threshold = hasAnomalyModel ? Math.max(0, mean + 2.25 * sd) : 0;
 
     let flagged7 = 0;
-    for (const t of expenseTx) {
-      if (!inRange(t.date, start7, now)) continue;
-      if (sd > 0 && t.amount >= threshold && t.amount >= mean * 1.4) flagged7 += 1;
+    if (hasAnomalyModel) {
+      for (const t of expenseTx) {
+        if (!inRange(t.date, start7, now)) continue;
+        if (t.amount >= threshold && t.amount >= mean * 1.4) flagged7 += 1;
+      }
     }
 
     const spendPace = incomeMtd > 0 ? expenseMtd / incomeMtd : 0;
@@ -227,21 +293,26 @@ export default function AIDailyBriefingCard() {
     const fmt = (n: number) => formatFromBase(Math.round(Number(n) || 0));
     const pct = (n: number) => `${Math.abs(n).toFixed(0)}%`;
 
-    return [
+    const insights: Insight[] = [
       {
         tone: projectedNet >= 0 ? 'positive' : 'warning',
         icon: <SavingsIcon />,
         title: 'Projected savings (month-end)',
         value: fmt(projectedNet),
         meta: `MTD net: ${fmt(netMtd)} · Based on ${daysElapsed}/${daysInMonth} days`,
+        meter: { value01: clamp01(daysElapsed / Math.max(1, daysInMonth)), tone: 'neutral', label: 'Month progress' },
+        tooltip: 'Projection = (month-to-date net ÷ days elapsed) × days in month',
       },
       {
-        tone: wowPct <= 0 ? 'positive' : 'warning',
+        tone: hasWowBaseline ? (wowPct <= 0 ? 'positive' : 'warning') : 'neutral',
         icon: <TrendIcon />,
         title: 'Weekly spend (last 7 days)',
         value: fmt(spend7),
-        meta: spendPrev7 > 0 ? `WoW: ${wowPct < 0 ? 'down' : 'up'} ${pct(wowPct)} vs previous week` : 'WoW: add more data to compare',
-        chip: spendPrev7 > 0 ? { cls: wowPct <= 0 ? chipTone.good : chipTone.warn, text: `${wowPct <= 0 ? 'Down' : 'Up'} ${pct(wowPct)}` } : { cls: chipTone.neutral, text: 'No baseline' },
+        meta: hasWowBaseline ? `WoW: ${wowPct < 0 ? 'down' : 'up'} ${pct(wowPct)} vs previous week` : 'WoW: add more data to compare',
+        chip: hasWowBaseline
+          ? { cls: wowPct <= 0 ? chipTone.good : chipTone.warn, text: `${wowPct <= 0 ? 'Down' : 'Up'} ${pct(wowPct)}` }
+          : { cls: chipTone.neutral, text: 'No baseline' },
+        tooltip: 'Compares total spend from the last 7 days vs the previous 7 days.',
       },
       {
         tone: topCatPct >= 45 ? 'warning' : 'neutral',
@@ -249,6 +320,8 @@ export default function AIDailyBriefingCard() {
         title: 'Top category (last 30 days)',
         value: topCatName,
         meta: spend30 > 0 ? `${fmt(topCatAmount)} · ${topCatPct.toFixed(0)}% of spend` : 'Add expenses to unlock category insights',
+        meter: spend30 > 0 ? { value01: clamp01(topCatPct / 100), tone: topCatPct >= 45 ? 'warning' : 'neutral', label: 'Category share' } : undefined,
+        tooltip: 'Looks at the last 30 days of expenses and finds the highest-spend category.',
       },
       {
         tone: max7 && sd > 0 && max7.amount >= threshold ? 'warning' : 'neutral',
@@ -256,6 +329,7 @@ export default function AIDailyBriefingCard() {
         title: 'Largest expense (last 7 days)',
         value: max7 ? fmt(max7.amount) : '—',
         meta: max7 ? `${(max7.description || topCatName || 'Expense').slice(0, 46)}${(max7.description || '').length > 46 ? '…' : ''}` : 'No recent expenses found',
+        tooltip: 'Highest single expense in the last 7 days.',
       },
       {
         tone: flagged7 === 0 ? 'neutral' : 'warning',
@@ -264,6 +338,7 @@ export default function AIDailyBriefingCard() {
         value: flagged7 === 0 ? 'None' : `${flagged7} flagged`,
         meta: threshold > 0 ? `Auto threshold: ~${fmt(threshold)} · Local-only check` : 'Build history to enable anomaly detection',
         chip: flagged7 === 0 ? { cls: chipTone.neutral, text: 'Stable' } : { cls: chipTone.warn, text: 'Review' },
+        tooltip: 'Flags unusually large expenses based on your last 30 days (simple on-device statistics).',
       },
       {
         tone: spendPace <= 0.75 ? 'positive' : spendPace <= 0.95 ? 'warning' : 'warning',
@@ -271,33 +346,92 @@ export default function AIDailyBriefingCard() {
         title: 'Spending pace (MTD)',
         value: fmt(expenseMtd),
         meta: incomeMtd > 0 ? `${Math.round(clamp01(spendPace) * 100)}% of income used · Proj spend: ${fmt(projectedSpend)}` : `Proj spend: ${fmt(projectedSpend)} · Add income for pace %`,
+        meter: incomeMtd > 0 ? { value01: clamp01(spendPace), tone: spendPace <= 0.75 ? 'positive' : 'warning', label: 'Used vs income' } : undefined,
+        tooltip: 'Spending pace = month-to-date expenses ÷ month-to-date income.',
       },
-    ] as const;
+    ];
+
+    const summary: string[] = [
+      projectedNet >= 0 ? `Month-end projection: save ~${fmt(projectedNet)}.` : `Month-end projection: short by ~${fmt(Math.abs(projectedNet))}.`,
+      hasWowBaseline
+        ? `Last 7 days vs previous 7: ${wowPct <= 0 ? 'down' : 'up'} ${pct(wowPct)} (${fmt(spend7)}).`
+        : `Add more expenses to unlock week-over-week comparisons.`,
+      spend30 > 0 ? `Biggest category: ${topCatName} (~${topCatPct.toFixed(0)}%).` : `Track expenses to unlock category insights.`,
+      incomeMtd > 0 ? `Spending pace: ${Math.round(clamp01(spendPace) * 100)}% of income used so far.` : `Add income to show spending pace vs income.`,
+    ];
+
+    const debug = `Calculations are done locally using your saved transactions (last 7/30 days + month-to-date).`;
+
+    return { insights, summary, debug };
   }, [categories, formatFromBase, now, transactions]);
 
   return (
-    <div className="surface surface-pad-sm surface-pressable">
-      <div className="flex items-start justify-between gap-3">
+    <div className="surface surface-pad-sm surface-pressable relative overflow-hidden">
+      <div className="flex items-start justify-between gap-3 relative">
         <div>
-          <div className="text-[13px] font-semibold text-slate-950">FinVision Daily Briefing</div>
-          <div className="mt-1 text-[12px] text-slate-600">Actionable highlights from your recent activity — private and on-device</div>
+          <div className="flex items-center gap-2">
+            <div className="text-[13px] font-semibold text-slate-950">FinVision Daily Briefing</div>
+            <span className="chip bg-gradient-to-r from-indigo-500/15 to-sky-500/15 text-slate-800 ring-indigo-500/20 dark:text-slate-100">
+              AI
+            </span>
+          </div>
+          <div className="mt-1 text-[12px] text-slate-600">Deep, on-device insights from your recent activity</div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="chip">Private</span>
+            <span className="chip">Local-only</span>
+            <span className="chip">No cloud required</span>
+          </div>
         </div>
-        <div className="chip">{todayLabel}</div>
+        <div className="flex items-center gap-2">
+          <div className="chip">{todayLabel}</div>
+          <button type="button" className="btn-chip" onClick={() => setShowDetails((v) => !v)} aria-expanded={showDetails}>
+            {showDetails ? 'Hide details' : 'Details'}
+          </button>
+        </div>
       </div>
 
+      {showDetails ? (
+        <div className="mt-3 tile tile-pad relative">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[12px] font-semibold text-slate-800 dark:text-slate-100">What this means</div>
+              <div className="mt-1 text-[11px] text-slate-500 leading-5">{briefing.debug}</div>
+            </div>
+            <div className="chip">Methodology</div>
+          </div>
+          <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[12px] text-slate-700 dark:text-slate-200">
+            {briefing.summary.map((s) => (
+              <li key={s} className="flex gap-2">
+                <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-indigo-500/60 shrink-0" aria-hidden="true" />
+                <span className="leading-5">{s}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {insights.map((i) => (
-          <div key={i.title} className="tile tile-pad flex items-start gap-3">
-            <div className={`h-9 w-9 rounded-2xl ring-1 grid place-items-center ${iconTone[i.tone as keyof typeof iconTone]}`}>
-              <span className="text-sm">{i.icon}</span>
+        {briefing.insights.map((i) => (
+          <div
+            key={i.title}
+            className="group tile tile-pad flex items-start gap-3 transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-0.5 hover:shadow-soft hover:bg-white/60 dark:hover:bg-slate-950/40"
+            title={i.tooltip || i.title}
+          >
+            <div
+              className={`h-9 w-9 rounded-2xl ring-1 grid place-items-center shrink-0 ${iconTone[i.tone as keyof typeof iconTone]} group-hover:scale-[1.02] transition-transform`}
+            >
+              <span className="text-sm" aria-hidden="true">
+                {i.icon}
+              </span>
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
                 <div className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">{i.title}</div>
-                {'chip' in i && i.chip ? <div className={i.chip.cls}>{i.chip.text}</div> : null}
+                {i.chip ? <div className={i.chip.cls}>{i.chip.text}</div> : null}
               </div>
-              <div className="mt-1 text-[15px] font-extrabold text-slate-900 tracking-tight">{i.value}</div>
+              <div className="mt-1 text-[16px] font-extrabold text-slate-950 dark:text-white tracking-tight">{i.value}</div>
               <div className="mt-1 text-[11px] text-slate-500 leading-5">{i.meta}</div>
+              {i.meter ? <Meter value01={i.meter.value01} tone={i.meter.tone} label={i.meter.label} /> : null}
             </div>
           </div>
         ))}
@@ -305,4 +439,3 @@ export default function AIDailyBriefingCard() {
     </div>
   );
 }
-

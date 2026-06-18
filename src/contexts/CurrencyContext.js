@@ -101,7 +101,7 @@ export const CurrencyProvider = ({ children }) => {
   useEffect(() => {
     const next = normalizeCode(displayCurrencyCode) || base;
     if (next !== displayCurrencyCode) setDisplayCurrencyCode(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [base]);
 
   useEffect(() => {

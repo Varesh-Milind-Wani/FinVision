@@ -86,6 +86,31 @@ const normalizeTransaction = (tx) => {
     }
   }
 
+  const normalizeLocation = (value) => {
+    if (!isObject(value)) return null;
+    const lat = num(value.lat, NaN);
+    const lng = num(value.lng, NaN);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+    const accuracy = num(value.accuracy, null);
+    const address = typeof value.address === 'string' ? value.address.trim() : '';
+    const provider = typeof value.provider === 'string' ? value.provider.trim() : '';
+
+    const capturedAtRaw = typeof value.capturedAt === 'string' ? value.capturedAt.trim() : '';
+    const capturedAt = Number.isFinite(Date.parse(capturedAtRaw)) ? capturedAtRaw : '';
+
+    return {
+      lat,
+      lng,
+      ...(accuracy != null && accuracy > 0 ? { accuracy } : {}),
+      ...(address ? { address } : {}),
+      ...(capturedAt ? { capturedAt } : {}),
+      ...(provider ? { provider } : {}),
+    };
+  };
+
+  const location = normalizeLocation(tx?.location);
+
   return {
     id,
     description,
@@ -95,13 +120,16 @@ const normalizeTransaction = (tx) => {
     ...(createdAt ? { createdAt } : {}),
     category,
     type,
+    ...(location ? { location } : {}),
     ...(type === 'investment'
       ? {
           name: name || description,
           quantity: num(tx?.quantity, 0) || 0,
           entryPrice: num(tx?.entryPrice, 0) || 0,
           ...(num(tx?.exitPrice, null) != null ? { exitPrice: num(tx?.exitPrice, null) } : {}),
+          ...(num(tx?.currentPrice, null) != null ? { currentPrice: num(tx?.currentPrice, null) } : {}),
           ...(num(tx?.profit, null) != null ? { profit: num(tx?.profit, null) } : {}),
+          ...(num(tx?.unrealizedProfit, null) != null ? { unrealizedProfit: num(tx?.unrealizedProfit, null) } : {}),
           ...(typeof tx?.status === 'string' && tx.status.trim() ? { status: tx.status.trim() } : {}),
         }
       : {}),

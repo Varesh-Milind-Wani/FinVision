@@ -7,6 +7,7 @@ import { CurrencyProvider } from './contexts/CurrencyContext';
 import { AmountsVisibilityProvider } from './contexts/AmountsVisibilityContext';
 import MainLayout from './components/MainLayout';
 import LandingPage from './components/LandingPage';
+import QrTransferPage from './pages/QrTransferPage';
 
 const AppContent = () => {
   const { isAuthenticated } = useAuth();
@@ -17,6 +18,24 @@ const AppContent = () => {
       return 'landing';
     }
   });
+
+  const qrParam = (() => {
+    try {
+      const url = new URL(window.location.href);
+      return url.searchParams.get('qr');
+    } catch {
+      return null;
+    }
+  })();
+
+  const qrPartParam = (() => {
+    try {
+      const url = new URL(window.location.href);
+      return url.searchParams.get('qrp');
+    } catch {
+      return null;
+    }
+  })();
 
   useEffect(() => {
     // Force light-only UI (prevents any dark flash on refresh).
@@ -85,6 +104,11 @@ const AppContent = () => {
         }}
       />
     );
+  }
+
+  // QR transfer landing (works even before auth, on a second device).
+  if (qrPartParam || qrParam) {
+    return <QrTransferPage encoded={qrParam} part={qrPartParam} />;
   }
 
   if (!isAuthenticated) {

@@ -120,10 +120,10 @@ const Header = () => {
                   type="button"
                   onClick={() => navigate(item.id)}
                   className={[
-                    'shrink-0 h-[39.6px] px-[21.6px] rounded-full text-[11.7px] sm:text-[12.6px] font-semibold tracking-[-0.01em] border border-black/25 hover:border-black/35 transition-colors shadow-[inset_0_0_0_1px_rgba(2,6,23,0.12)]',
+                    'shrink-0 h-[39.6px] px-[21.6px] rounded-full text-[11.7px] sm:text-[12.6px] font-semibold tracking-[-0.01em] ring-1 ring-slate-200/80 hover:ring-slate-300/80 dark:ring-white/10 dark:hover:ring-white/20 transition-[background-color,box-shadow,transform] duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-emerald-500/35 active:translate-y-[0.5px]',
                     isActive
-                      ? 'bg-emerald-50 text-emerald-800 shadow-[0_12px_26px_-18px_rgba(16,185,129,0.45)]'
-                      : 'bg-white/70 text-slate-800 hover:bg-white/90 shadow-[0_8px_20px_-22px_rgba(15,23,42,0.10)]',
+                      ? 'bg-emerald-50 text-emerald-800 ring-emerald-500/20 shadow-[0_12px_26px_-18px_rgba(16,185,129,0.40)]'
+                      : 'bg-slate-50/60 text-slate-800 hover:bg-white/80 shadow-[0_8px_20px_-22px_rgba(15,23,42,0.10)]',
                   ].join(' ')}
                   aria-current={isActive ? 'page' : undefined}
                 >
