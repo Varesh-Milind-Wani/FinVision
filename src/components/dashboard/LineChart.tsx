@@ -113,7 +113,7 @@ const IncomeExpenseLineChart = () => {
       </div>
 
       <div className="px-2 sm:px-4 pt-4">
-        <div className="h-[220px] sm:h-[250px]">
+        <div className="h-[280px] sm:h-[320px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
               <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.06)" />

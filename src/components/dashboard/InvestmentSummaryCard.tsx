@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
 import {
   Area,
@@ -17,18 +17,12 @@ import { useCurrency } from '../../contexts/CurrencyContext';
 import { useDelayedCountUp } from '../../hooks/useDelayedCountUp';
 import { useExpenseContext } from '../../contexts/ExpenseContext';
 
-type Point = { v: number; idx: number };
-
 type Props = {
   title?: string;
   total: number;
   investAmount: number;
   series: number[];
 };
-
-function EmptyTooltip() {
-  return null;
-}
 
 function ModalTooltip({ active, payload, label, formatValue }: any) {
   if (!active || !payload?.length) return null;
@@ -78,18 +72,50 @@ function TrendUpIcon() {
   );
 }
 
+function InvestmentSparkline({ data, height = 48 }: { data: number[]; height?: number }) {
+  const pts = (data || []).filter((n) => Number.isFinite(n));
+  if (pts.length < 2) return null;
+  const min = Math.min(...pts);
+  const max = Math.max(...pts);
+  const range = max - min || 1;
+  const pad = range * 0.12;
+  const yMin = min - pad;
+  const yMax = max + pad;
+  const safeR = yMax - yMin || 1;
+  const vbW = 300;
+  const vbH = height;
+  const stepX = (vbW - 6) / (pts.length - 1);
+  const toY = (v: number) => 4 + ((yMax - v) / safeR) * (vbH - 8);
+  const d = pts.map((v, i) => `${i === 0 ? 'M' : 'L'} ${3 + i * stepX} ${toY(v)}`).join(' ');
+  const areaD = `${d} L ${vbW - 3} ${vbH - 3} L 3 ${vbH - 3} Z`;
+  const last = pts[pts.length - 1];
+  const first = pts[0];
+  const up = last >= first;
+  const s = up ? '#7C3AED' : '#F97316';
+  return (
+    <svg width="100%" height={vbH} viewBox={`0 0 ${vbW} ${vbH}`} preserveAspectRatio="xMidYMid meet" className="block">
+      <defs>
+        <linearGradient id={`ig-${s.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={s} stopOpacity={0.2} />
+          <stop offset="100%" stopColor={s} stopOpacity={0.02} />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#ig-${s.replace('#', '')})`} stroke="none" />
+      <path d={d} fill="none" stroke={s} strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={vbW - 3} cy={toY(last)} r={2} fill={s} />
+    </svg>
+  );
+}
+
 export default function InvestmentSummaryCard({ title = 'Total Investment', total, investAmount, series }: Props) {
   const { formatFromBase } = useCurrency();
   const { transactions, editTransaction } = useExpenseContext() as any;
   const delayMs = 1000;
   const durationMs = 7000;
-  const { value: invV, phase, isDone } = useDelayedCountUp(Number(total) || 0, { delayMs, durationMs, startValue: 0 });
-  const [showDot, setShowDot] = React.useState(false);
+  const { value: invV, phase } = useDelayedCountUp(Number(total) || 0, { delayMs, durationMs, startValue: 0 });
   const [chartOpen, setChartOpen] = React.useState(false);
   const [infoOpen, setInfoOpen] = React.useState(false);
   const [now, setNow] = React.useState(() => new Date());
-  const [miniHover, setMiniHover] = React.useState<{ idx: number; v: number } | null>(null);
-  const miniHoverIdxRef = React.useRef<number | null>(null);
   const [editCell, setEditCell] = React.useState<{ id: string; field: 'entryPrice' | 'currentPrice' | 'exitPrice' } | null>(null);
   const [editValue, setEditValue] = React.useState('');
   const [editError, setEditError] = React.useState('');
@@ -281,89 +307,8 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
     return holdingsRiskInputs.count > 0 || invested > 0 || curTotal > 0;
   }, [holdingsRiskInputs.count, investAmount, total]);
 
-  const chartAnimationMs = durationMs;
-  const chartKey = phase === 'loading' ? 'loading' : 'counting';
   const fillId = React.useId();
   const strokeId = React.useId();
-
-  const data = React.useMemo(() => {
-    const clean = (series || []).map((n) => (Number.isFinite(Number(n)) ? Number(n) : 0));
-    const trimmed = clean.length ? clean.slice(-18) : [0, 0, 0, 0];
-    const lastIdx = Math.max(0, trimmed.length - 1);
-    return trimmed.map((v, idx) => ({ v, idx, lastIdx })) as Array<Point & { lastIdx: number }>;
-  }, [series]);
-
-  const { domain, isUp } = React.useMemo(() => {
-    const vals = data.map((p) => Number(p?.v) || 0);
-    const rawMin = vals.length ? Math.min(...vals) : 0;
-    const rawMax = vals.length ? Math.max(...vals) : 0;
-    let min = rawMin;
-    let max = rawMax;
-    const span = Math.max(0, max - min);
-
-    // Add extra padding so small moves still look like moves.
-    const pad = Math.max(span * 0.28, Math.max(1, Math.abs(max) * 0.02));
-    let lo = min - pad;
-    let hi = max + pad;
-
-    // Avoid showing negative/positive padding if the data never crosses zero.
-    if (rawMin >= 0) lo = Math.max(0, lo);
-    if (rawMax <= 0) hi = Math.min(0, hi);
-
-    const first = vals[0] ?? 0;
-    const last = vals[vals.length - 1] ?? 0;
-    return { domain: [lo, hi] as [number, number], isUp: last >= first };
-  }, [data]);
-
-  const stroke = isUp ? '#7C3AED' : '#F97316';
-  const gridStroke = 'rgba(15,23,42,0.08)';
-  const miniStroke = '#F97316';
-
-  const miniData = React.useMemo(() => {
-    const base = Array.isArray(data) ? data : [];
-    if (!base.length) return base as any;
-
-    const lastReal = base[base.length - 1] as any;
-    const prevReal = base.length >= 2 ? (base[base.length - 2] as any) : null;
-    const lastV = Number(lastReal?.v) || 0;
-    const prevV = prevReal ? Number(prevReal?.v) || 0 : lastV;
-    const delta = Math.max(0, lastV - prevV);
-    const step = delta > 0 ? delta * 0.55 : Math.max(1, Math.abs(lastV) * 0.01);
-
-    const projCount = 6;
-    const lastRealIdx = Number.isFinite(Number(lastReal?.idx)) ? Number(lastReal.idx) : base.length - 1;
-    const extended: any[] = base.map((p: any) => ({ ...p, lastRealIdx, isProj: false, proj: null }));
-
-    if (showPrediction && hasInvestments) {
-      for (let i = 1; i <= projCount; i += 1) {
-        extended.push({
-          ...lastReal,
-          idx: lastRealIdx + i,
-          v: null,
-          proj: lastV + step * i,
-          lastRealIdx,
-          isProj: true,
-          lastIdx: lastRealIdx + projCount,
-        });
-      }
-    }
-
-    return extended;
-  }, [data, hasInvestments, showPrediction]);
-
-  const miniDomain = React.useMemo(() => {
-    const projMax = (miniData as any[]).reduce((m, p: any) => Math.max(m, Number(p?.proj) || 0), Number.NEGATIVE_INFINITY);
-    const hi = Number.isFinite(projMax) ? Math.max(domain[1], projMax) : domain[1];
-    return [domain[0], hi] as [number, number];
-  }, [domain, miniData]);
-
-  React.useEffect(() => {
-    setShowDot(false);
-    if (!hasInvestments) return;
-    if (!isDone) return;
-    const t = window.setTimeout(() => setShowDot(true), 150);
-    return () => window.clearTimeout(t);
-  }, [hasInvestments, isDone]);
 
   type RangeDays = 7 | 30 | 90 | 180 | 365 | 1825;
   const [rangeDays, setRangeDays] = React.useState<RangeDays>(30);
@@ -711,9 +656,17 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
       return { tone: 'flat' as const, text: 'Needs review' };
     })();
 
+    const firstPoint = Number(modalData[0]?.value);
+    const lastPoint = Number(modalData[modalData.length - 1]?.value);
+    const startTs = Number(modalData[0]?.ts) || 0;
+    const endTs = Number(modalData[modalData.length - 1]?.ts) || 0;
+    const years = startTs > 0 && endTs > startTs ? (endTs - startTs) / 31_557_600_000 : 0; // average year length
+    const cagrPct = firstPoint > 0 && years > 0 ? Math.pow(lastPoint / firstPoint, 1 / years) - 1 : 0;
+
     return {
       profit,
       profitPct,
+      cagrPct,
       volScore,
       volatility,
       riskScore,
@@ -1093,18 +1046,21 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
   };
 
   return (
-    <div className="kpi-card overflow-hidden flex flex-col">
+    <div className="kpi-card relative group hover:shadow-lg transition-all duration-300 ring-1 ring-black/[0.04] bg-white flex flex-col">
       {/* Header row */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center justify-between gap-3 relative z-10">
+        <div className="flex items-center gap-2.5">
           <div
-            className={`h-8 w-8 rounded-xl grid place-items-center shrink-0 ring-1 ${
-              phase === 'loading' ? 'bg-slate-100 ring-black/5' : 'bg-orange-50 ring-orange-100'
+            className={`h-9 w-9 rounded-xl grid place-items-center ring-1 transition-all duration-300 ${
+              phase === 'loading' ? 'bg-slate-100 text-slate-500 ring-black/5' : 'bg-orange-50 text-orange-600 ring-orange-500/10 group-hover:bg-orange-100'
             }`}
           >
-            <div className={`h-3.5 w-3.5 rounded ${phase === 'loading' ? 'bg-slate-400/60' : 'bg-orange-600'}`} />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>
           </div>
-          <div className="min-w-0 text-[12px] font-semibold text-slate-600 truncate">{title}</div>
+          <div>
+            <div className="text-[12px] font-bold text-slate-600 tracking-tight uppercase">{title}</div>
+            <div className="mt-0.5 text-[10px] text-slate-400 font-semibold">Current value</div>
+          </div>
         </div>
         <button
           type="button"
@@ -1115,135 +1071,33 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
           <MoreIcon />
         </button>
       </div>
+      <div className="mt-2">
+        <div className="text-[24px] sm:text-[26px] leading-[30px] sm:leading-[32px] font-semibold tracking-[-0.03em] text-slate-950 tabular-nums">{formatFromBase(invV)}</div>
+        <div className="mt-1 flex items-center gap-1.5 text-[12px]">
+          <span className="text-slate-500 tracking-tight">Invested {formatFromBase(Number(investAmount) || 0)}</span>
+          {hasInvestments ? (
+            <span className={['inline-flex items-center rounded-sm px-1 py-0.5 text-[10px] font-bold tabular-nums', (Number(total) - Number(investAmount)) >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'].join(' ')}>
+              {(Number(total) - Number(investAmount)) >= 0 ? '+' : ''}{((Number(total) - Number(investAmount)) / Math.max(1, Number(investAmount)) * 100).toFixed(1)}%
+            </span>
+          ) : null}
+        </div>
+      </div>
 
-      {phase === 'loading' ? (
+{hasInvestments && series && series.length > 1 ? (
+         <div className="mt-auto pt-2">
+           <div className="w-full max-w-full overflow-hidden">
+             <InvestmentSparkline data={series as number[]} height={36} />
+           </div>
+           <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
+             <span className="text-slate-500">{activePositions.length} holding{activePositions.length === 1 ? '' : 's'}</span>
+             <span onClick={() => setChartOpen(true)} className="cursor-pointer text-orange-600 hover:text-orange-700 transition-colors">Trend & details →</span>
+           </div>
+         </div>
+      ) : phase === 'loading' ? (
         <div className="flex-1 grid place-items-center">
           <span className="kpi-loader" aria-label="Loading" />
         </div>
-      ) : (
-        <>
-          {/* Chart section (full width, top) */}
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={() => setChartOpen(true)}
-              className="h-[84px] w-full rounded-2xl overflow-hidden ring-1 ring-black/5 bg-gradient-to-b from-white to-slate-50/70 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-              aria-label="Open interactive investment chart"
-              title="Click to open"
-            >
-              <div className="relative h-full w-full">
-  <div className="absolute inset-0 bg-white/35 backdrop-blur-[2px]" />
-  <div className="relative h-full w-[78%] ml-auto">
-    <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart
-        key={chartKey}
-        data={miniData as any}
-        margin={{ top: 12, right: 10, bottom: 6, left: 10 }}
-        onMouseMove={(state: any) => {
-          const p = state?.activePayload?.[0]?.payload;
-          if (!p || p?.isProj) {
-            if (miniHoverIdxRef.current != null) {
-              miniHoverIdxRef.current = null;
-              setMiniHover(null);
-            }
-            return;
-          }
-
-          const idx = Number(p.idx);
-          const v = Number(p.v) || 0;
-          if (!Number.isFinite(idx)) return;
-          if (miniHoverIdxRef.current === idx) return;
-          miniHoverIdxRef.current = idx;
-          setMiniHover({ idx, v });
-        }}
-        onMouseLeave={() => {
-          miniHoverIdxRef.current = null;
-          setMiniHover(null);
-        }}
-      >
-        <defs>
-          <filter id={`${strokeId}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor={miniStroke} floodOpacity="0.26" />
-          </filter>
-          <linearGradient id={strokeId} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={miniStroke} stopOpacity={0.55} />
-            <stop offset="55%" stopColor={miniStroke} stopOpacity={1} />
-            <stop offset="100%" stopColor={miniStroke} stopOpacity={0.85} />
-          </linearGradient>
-          <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={miniStroke} stopOpacity={0.22} />
-            <stop offset="70%" stopColor={miniStroke} stopOpacity={0.06} />
-            <stop offset="100%" stopColor={miniStroke} stopOpacity={0.0} />
-          </linearGradient>
-        </defs>
-        <Tooltip cursor={{ stroke: 'rgba(148,163,184,0.65)', strokeDasharray: '2 6' }} content={<EmptyTooltip />} />
-        {hasInvestments ? <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.08)" strokeDasharray="2 7" /> : null}
-        <YAxis hide domain={miniDomain} />
-        {Number(investAmount) > 0 ? (
-          <ReferenceLine y={Number(investAmount) || 0} stroke="rgba(148,163,184,0.65)" strokeDasharray="2 6" ifOverflow="extendDomain" />
-        ) : null}
-        {hasInvestments && showPrediction ? (
-          <Line
-            type="monotone"
-            dataKey="proj"
-            stroke="rgba(148,163,184,0.75)"
-            strokeDasharray="2 6"
-            strokeWidth={2}
-            dot={false}
-            activeDot={false as any}
-            connectNulls
-            isAnimationActive={false}
-          />
-        ) : null}
-        <Area
-          type="monotone"
-          dataKey="v"
-          stroke={`url(#${strokeId})`}
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill={`url(#${fillId})`}
-          fillOpacity={1}
-          style={{ filter: `url(#${strokeId}-shadow)` }}
-          isAnimationActive
-          animationDuration={chartAnimationMs}
-          animationBegin={0}
-          animationEasing="linear"
-          dot={(p: any) => {
-            if (!p?.payload) return null;
-            if (p.payload.isProj) return null;
-            if (p.payload.idx !== p.payload.lastRealIdx) return null;
-            if (!hasInvestments) return null;
-            if (!showDot) return null;
-            return (
-              <g>
-                <circle cx={p.cx} cy={p.cy} r="11.5" fill={miniStroke} opacity="0.12" />
-                <circle cx={p.cx} cy={p.cy} r="8.2" fill={miniStroke} opacity="0.22" />
-                <circle cx={p.cx} cy={p.cy} r="5.2" fill={miniStroke} opacity="0.30" />
-                <circle cx={p.cx} cy={p.cy} r="4.2" fill={miniStroke} stroke="#FFFFFF" strokeWidth="2" />
-              </g>
-            );
-          }}
-          activeDot={{ r: 4.5, stroke: '#ffffff', strokeWidth: 2, fill: miniStroke }}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
-  </div>
-</div>
-            </button>
-          </div>
-
-          {/* Value section (below chart, never wrap) */}
-          <div className="mt-auto pt-2.5 pb-2.5 sm:pb-3 flex items-center gap-2.5 whitespace-nowrap -translate-y-[5px]">
-            <div className="h-6 w-6 rounded-lg bg-[#DCFCE7] text-[#16A34A] grid place-items-center shrink-0">
-              <TrendUpIcon />
-            </div>
-            <div className="text-[26px] leading-[32px] font-semibold tracking-[-0.03em] text-slate-950 tabular-nums min-h-[40px] flex items-center w-full">
-              {formatFromBase(miniHover ? miniHover.v : invV)}
-            </div>
-          </div>
-        </>
-      )}
+      ) : null}
 
       {chartOpen
         ? createPortal(
@@ -1615,12 +1469,15 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
                                   <div className={['mt-1 text-[18px] sm:text-[20px] font-extrabold tabular-nums', summaryStats.profit >= 0 ? 'text-emerald-700' : 'text-rose-700'].join(' ')}>
                                     {summaryStats.profit >= 0 ? '+' : '-'}{formatFromBase(Math.abs(summaryStats.profit))}
                                   </div>
+                                  <div className={['mt-1 text-sm tabular-nums font-semibold', summaryStats.profitPct >= 0 ? 'text-emerald-600' : 'text-rose-600'].join(' ')}>
+                                    {summaryStats.profitPct >= 0 ? '+' : '-'}{Math.abs(summaryStats.profitPct).toFixed(1)}%
+                                  </div>
                                 </div>
                                 {summaryStats.hasAnyInvestment ? (
                                   <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
                                     <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-indigo-500/45 to-violet-500/45" />
                                     <div className="mt-2 text-[12px] font-semibold text-slate-500">CAGR (est.)</div>
-                                    <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{(projections.annualRate * 100).toFixed(1)}%</div>
+                                    <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{(summaryStats.cagrPct * 100).toFixed(1)}%</div>
                                   </div>
                                 ) : null}
                                 {summaryStats.hasAnyInvestment ? (

@@ -1825,7 +1825,7 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
                     <iframe
                       title="Location map preview"
                       src={osmEmbedUrl}
-                      className="block w-full h-44 bg-white dark:bg-slate-950"
+                      className="block w-full h-44 bg-white dark:bg-slate-950 pointer-events-none"
                       style={{ border: 0 }}
                       loading="lazy"
                       referrerPolicy="no-referrer-when-downgrade"

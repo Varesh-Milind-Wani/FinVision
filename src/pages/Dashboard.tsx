@@ -267,11 +267,11 @@ const Dashboard = () => {
         </div>
 
         <section className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-          <div className="min-w-0">
+          <div className="min-w-0 h-full flex flex-col">
             <BalanceCard />
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 h-full flex flex-col">
             <SummaryCard
               title="Monthly income"
               value={
@@ -285,8 +285,13 @@ const Dashboard = () => {
               }
               deltaLabel={`${monthCompare.incomeDeltaPct >= 0 ? '+' : '-'}${Math.abs(monthCompare.incomeDeltaPct).toFixed(1)}% compared to last month`}
               deltaTone={monthCompare.incomeDeltaPct >= 0 ? 'up' : 'down'}
-              deltaVariant="badge"
+              deltaVariant="text"
               iconTone="emerald"
+              icon={
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-white opacity-95">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              }
               isLoading={incomeLoading}
               emptyRightLabel={null}
               modal={{
@@ -299,11 +304,11 @@ const Dashboard = () => {
             />
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 h-full flex flex-col">
             <InvestmentSummaryCard total={investment.total} investAmount={investment.investAmount} series={investment.spark} />
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 h-full flex flex-col">
             <DonutSummaryCard />
           </div>
         </section>

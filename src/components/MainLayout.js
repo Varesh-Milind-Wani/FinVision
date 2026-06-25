@@ -24,10 +24,11 @@ const Settings = React.lazy(loadSettings);
 const Goals = React.lazy(loadGoals);
 const AIInsights = React.lazy(loadInsights);
 const AIChatAssistant = React.lazy(loadAIChatAssistant);
+const TransactionMap = React.lazy(() => import('./TransactionMap'));
 
 const TAB_STORAGE_KEY = 'finvision.activeTab';
 const LAYOUT_UI_STORAGE_KEY = 'finvision.layoutUi.v1';
-const ALLOWED_TABS = new Set(['dashboard', 'transactions', 'charts', 'networth', 'goals', 'insights', 'settings']);
+const ALLOWED_TABS = new Set(['dashboard', 'transactions', 'categories', 'charts', 'networth', 'goals', 'insights', 'settings']);
 const FAB_POS_STORAGE_KEY = 'finvision.fabPos.v1';
 
 const TabFallback = ({ label }) => (
@@ -280,22 +281,33 @@ const SectionTitle = ({ title, actionButton, subtitle }) => (
   </div>
 );
 
-const TransactionsPanel = React.memo(function TransactionsPanel({ onOpenTransactionModal }) {
+const TransactionsPanel = React.memo(function TransactionsPanel({ onOpenTransactionModal, onOpenMapModal }) {
   return (
     <>
       <SectionTitle
         title="Transaction Manager"
         subtitle="Add, edit, and filter transactions. Your data stays in sync with Charts and Net Worth."
         actionButton={
-          <button
-            onClick={onOpenTransactionModal}
-            className="btn-primary-gradient text-sm active:scale-[0.98]"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            New Transaction
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={onOpenMapModal}
+              className="btn-surface text-sm active:scale-[0.98]"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z" clipRule="evenodd" />
+              </svg>
+              View Location Heat Map
+            </button>
+            <button
+              onClick={onOpenTransactionModal}
+              className="btn-primary-gradient text-sm active:scale-[0.98]"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              New Transaction
+            </button>
+          </div>
         }
       />
 
@@ -386,7 +398,10 @@ const MainLayout = () => {
     };
   }, []);
 
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+
   const openTransactionModal = useCallback(() => setIsTransactionModalOpen(true), []);
+  const openMapModal = useCallback(() => setIsMapModalOpen(true), []);
 
   useEffect(() => {
     try {
@@ -490,7 +505,7 @@ const MainLayout = () => {
     return () => window.clearTimeout(t);
   }, [activeTab, preloadTab]);
 
-  useBodyScrollLock(isTransactionModalOpen || isCategoryModalOpen);
+  useBodyScrollLock(isTransactionModalOpen || isCategoryModalOpen || isMapModalOpen);
 
   useEffect(() => {
     // Ensure landing-page scroll lock never leaks into the app shell.
@@ -498,11 +513,11 @@ const MainLayout = () => {
     document.documentElement.classList.remove('landing-root-lock');
     document.body.classList.remove('landing-root-lock');
 
-    if (isTransactionModalOpen || isCategoryModalOpen) return;
+    if (isTransactionModalOpen || isCategoryModalOpen || isMapModalOpen) return;
 
     // Safety net: if a modal/overlay leaves the body locked, force unlock.
     forceUnlockBodyScroll();
-  }, [isCategoryModalOpen, isTransactionModalOpen]);
+  }, [isCategoryModalOpen, isTransactionModalOpen, isMapModalOpen]);
 
   useEffect(() => {
     // iOS Safari occasionally needs a reflow/resize to paint below-the-fold content after initial mount.
@@ -592,7 +607,7 @@ const MainLayout = () => {
         {/* Transaction Management Section */}
         {activeTab === 'transactions' ? (
           <section>
-            <TransactionsPanel onOpenTransactionModal={openTransactionModal} />
+            <TransactionsPanel onOpenTransactionModal={openTransactionModal} onOpenMapModal={openMapModal} />
             {/*
               <>
                 <SectionTitle 
@@ -741,35 +756,42 @@ const MainLayout = () => {
       
       {/* Transaction Modal */}
       {isTransactionModalOpen && (
-        <div className="fixed inset-0 z-50">
-          <div aria-hidden="true" className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" />
-          <div className="relative h-full w-full flex items-center justify-center px-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:p-6">
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Add transaction"
-              className="w-[min(560px,92vw)] max-h-[calc(100dvh-3rem)] overflow-hidden rounded-3xl bg-white/90 dark:bg-slate-950/70 backdrop-blur-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/[0.12] flex flex-col"
-            >
-              <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-black/5 dark:border-white/10">
-                <div className="min-w-0">
-                  <div className="font-display text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white truncate">Add Transaction</div>
-                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    Saved locally {'\u2022'} No data leaves your browser
-                  </div>
+        <div className="fixed inset-0 z-[100]">
+          <div aria-hidden="true" className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setIsTransactionModalOpen(false)} />
+          <div className="absolute inset-0 overflow-y-auto pointer-events-none">
+            <div className="min-h-full flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Add transaction"
+                className="w-full sm:w-[min(560px,92vw)] shrink-0 mt-auto sm:my-auto flex flex-col max-h-[92dvh] sm:max-h-[calc(100dvh-2rem)] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl shadow-2xl ring-1 ring-black/10 dark:ring-white/[0.12] pointer-events-auto transition-transform mx-auto"
+              >
+                {/* Mobile Handle */}
+                <div className="w-full flex justify-center pt-3 pb-1 sm:hidden shrink-0" aria-hidden="true">
+                  <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700/60" />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsTransactionModalOpen(false)}
-                  className="shrink-0 h-9 w-9 rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.12] bg-slate-50/80 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/55 transition-colors grid place-items-center"
-                  aria-label="Close"
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
-              </div>
-              <div className="px-6 py-4 flex-1 min-h-0 overflow-auto scrollbar-hide">
-                <TransactionForm variant="embedded" onClose={() => setIsTransactionModalOpen(false)} />
+                
+                <div className="flex items-start justify-between gap-4 px-5 sm:px-6 py-3 sm:py-4 border-b border-black/5 dark:border-white/10 shrink-0">
+                  <div className="min-w-0">
+                    <div className="font-display text-xl sm:text-xl font-extrabold text-slate-900 dark:text-white truncate">Add Transaction</div>
+                    <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      Saved locally {'\u2022'} No data leaves your browser
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsTransactionModalOpen(false)}
+                    className="shrink-0 h-9 w-9 rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.12] bg-slate-50/80 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/55 transition-colors grid place-items-center"
+                    aria-label="Close"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="px-5 sm:px-6 py-4 flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-hide pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  <TransactionForm variant="embedded" onClose={() => setIsTransactionModalOpen(false)} />
+                </div>
               </div>
             </div>
           </div>
@@ -778,39 +800,53 @@ const MainLayout = () => {
       
       {/* Category Modal */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-50">
-          <div aria-hidden="true" className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" />
-          <div className="relative h-full w-full flex items-center justify-center px-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:p-6">
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Add category"
-              className="w-[min(520px,92vw)] max-h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-5rem)] overflow-hidden rounded-3xl bg-white/90 dark:bg-slate-950/70 backdrop-blur-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/[0.12] flex flex-col"
-            >
-              <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-black/5 dark:border-white/10">
-                <div className="min-w-0">
-                  <div className="font-display text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white truncate">Add Category</div>
-                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    Saved locally {'\u2022'} Used for charts and budgets
-                  </div>
+        <div className="fixed inset-0 z-[100]">
+          <div aria-hidden="true" className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setIsCategoryModalOpen(false)} />
+          <div className="absolute inset-0 overflow-y-auto pointer-events-none">
+            <div className="min-h-full flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Add category"
+                className="w-full sm:w-[min(520px,92vw)] shrink-0 mt-auto sm:my-auto flex flex-col max-h-[92dvh] sm:max-h-[calc(100dvh-2rem)] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl shadow-2xl ring-1 ring-black/10 dark:ring-white/[0.12] pointer-events-auto transition-transform mx-auto"
+              >
+                {/* Mobile Handle */}
+                <div className="w-full flex justify-center pt-3 pb-1 sm:hidden shrink-0" aria-hidden="true">
+                  <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700/60" />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCategoryModalOpen(false)}
-                  className="shrink-0 h-9 w-9 rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.12] bg-slate-50/80 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/55 transition-colors grid place-items-center"
-                  aria-label="Close"
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
-              </div>
-              <div className="px-6 py-5 flex-1 min-h-0 overflow-auto scrollbar-hide">
-                <CategoryForm onClose={() => setIsCategoryModalOpen(false)} />
+
+                <div className="flex items-start justify-between gap-4 px-5 sm:px-6 py-3 sm:py-5 border-b border-black/5 dark:border-white/10 shrink-0">
+                  <div className="min-w-0">
+                    <div className="font-display text-xl sm:text-xl font-extrabold text-slate-900 dark:text-white truncate">Add Category</div>
+                    <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      Saved locally {'\u2022'} Used for charts and budgets
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCategoryModalOpen(false)}
+                    className="shrink-0 h-9 w-9 rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.12] bg-slate-50/80 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/55 transition-colors grid place-items-center"
+                    aria-label="Close"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="px-5 sm:px-6 py-4 flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-hide pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  <CategoryForm onClose={() => setIsCategoryModalOpen(false)} />
+                </div>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Map Modal */}
+      {isMapModalOpen && (
+        <Suspense fallback={null}>
+          <TransactionMap onClose={() => setIsMapModalOpen(false)} />
+        </Suspense>
       )}
 
       <Footer />

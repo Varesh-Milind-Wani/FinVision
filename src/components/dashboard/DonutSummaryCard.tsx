@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import DonutChart from './DonutChart';
 import { useExpenseContext } from '../../contexts/ExpenseContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
@@ -28,36 +28,36 @@ function TrendBadge({ pct, tone }: { pct: number; tone: 'up' | 'down' | 'flat' }
   const isDown = tone === 'down';
 
   const cls = isUp
-    ? 'bg-rose-50 text-rose-600 ring-rose-200/70'
+    ? 'text-emerald-700 bg-emerald-50/50'
     : isDown
-      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70'
-      : 'bg-slate-50 text-slate-500 ring-slate-200/70';
+      ? 'text-rose-700 bg-rose-50/50'
+      : 'text-slate-600 bg-slate-50/50';
 
   return (
-    <span className={['inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-extrabold ring-1 tabular-nums', cls].join(' ')}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <span className={['inline-flex items-center gap-1 rounded-md px-1.5 py-0.5', cls].join(' ')}>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true" className={isUp ? 'text-emerald-600' : isDown ? 'text-rose-600' : 'text-slate-400'}>
         <path
           d={isUp ? 'M6 15l5-5 3 3 4-4' : isDown ? 'M6 9l5 5 3-3 4 4' : 'M6 12h12'}
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
       </svg>
-      {label}
+      <span className="text-[10px] font-bold tracking-tight">{label}</span>
     </span>
   );
 }
 
 function Sparkline({ values, tone = 'rose' }: { values: number[]; tone?: 'rose' | 'emerald' }) {
   const clean = (Array.isArray(values) ? values : []).map((n) => (Number.isFinite(Number(n)) ? Number(n) : 0));
-  const n = clean.length;
-  const w = 140;
-  const h = 56;
-  const pad = 6;
-  if (n <= 1) {
-    return <div className="h-14 rounded-xl bg-slate-50 ring-1 ring-black/5" aria-hidden="true" />;
-  }
+const n = clean.length;
+   const w = 100;
+   const h = 32; // Increased from 24 to 32 for better visibility
+   const pad = 2;
+   if (n <= 1) {
+     return <div className="h-8 rounded-md bg-slate-50" aria-hidden="true" />; // Increased from h-6 to h-8
+   }
 
   const min = Math.min(...clean);
   const max = Math.max(...clean);
@@ -91,27 +91,25 @@ function Sparkline({ values, tone = 'rose' }: { values: number[]; tone?: 'rose' 
   const stroke = tone === 'emerald' ? '#10b981' : '#ff5a5f';
   const end = points[points.length - 1];
 
-  return (
-    <div className="relative h-14 w-full rounded-2xl bg-white/70 ring-1 ring-black/[0.06] shadow-[0_14px_30px_-26px_rgba(15,23,42,0.55)] overflow-hidden">
-      <svg viewBox={`0 0 ${w} ${h}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
+return (
+     <div className="relative h-8 w-full overflow-hidden">
+       <svg viewBox={`0 0 ${w} ${h}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
         <defs>
           <linearGradient id={`${id}-stroke`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={stroke} stopOpacity="0.25" />
-            <stop offset="45%" stopColor={stroke} stopOpacity="0.95" />
-            <stop offset="100%" stopColor={stroke} stopOpacity="0.75" />
+            <stop offset="0%" stopColor={stroke} stopOpacity="0.2" />
+            <stop offset="50%" stopColor={stroke} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={stroke} stopOpacity="0.4" />
           </linearGradient>
           <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={stroke} stopOpacity="0.16" />
-            <stop offset="85%" stopColor={stroke} stopOpacity="0.03" />
+            <stop offset="0%" stopColor={stroke} stopOpacity="0.1" />
             <stop offset="100%" stopColor={stroke} stopOpacity="0" />
           </linearGradient>
         </defs>
 
-        <path d={smoothPath()} fill="none" stroke={`url(#${id}-stroke)`} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={smoothPath()} fill="none" stroke={`url(#${id}-stroke)`} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         <path d={`${smoothPath()} L ${w - pad} ${h - pad} L ${pad} ${h - pad} Z`} fill={`url(#${id}-fill)`} />
 
-        <circle cx={end.x} cy={end.y} r="5.8" fill={stroke} opacity="0.14" />
-        <circle cx={end.x} cy={end.y} r="3.1" fill={stroke} stroke="#fff" strokeWidth="2" />
+        <circle cx={end.x} cy={end.y} r="2" fill={stroke} />
       </svg>
     </div>
   );
@@ -319,93 +317,86 @@ const DonutSummaryCard = () => {
   const topCategory = active?.center?.name || '—';
 
   return (
-    <div className="kpi-card overflow-hidden relative flex flex-col bg-white shadow-[0_10px_26px_-18px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04]">
-      <div className="flex items-start justify-between gap-3">
+    <div className="kpi-card overflow-hidden relative flex flex-col bg-white ring-1 ring-black/[0.04] group hover:shadow-lg transition-all duration-300">
+      <div className="flex items-center justify-between gap-3 relative z-10">
         <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-2xl bg-rose-50 text-rose-600 grid place-items-center ring-1 ring-rose-100">
+          <div className="h-9 w-9 rounded-xl bg-rose-50 text-rose-600 grid place-items-center ring-1 ring-rose-500/10 transition-all duration-300 group-hover:bg-rose-100">
             <PieIcon />
           </div>
           <div>
-            <div className="text-[13px] md:text-[14px] font-semibold text-slate-800">All expenses</div>
-            <div className="mt-0.5 text-[11px] md:text-[12px] text-slate-400 font-semibold">{periodLabel}</div>
+            <div className="text-[12px] font-bold text-slate-600 tracking-tight uppercase">ALL EXPENSES</div>
+            <div className="mt-0.5 text-[10px] text-slate-400 font-semibold">{periodLabel}</div>
           </div>
         </div>
 
-        <button
-          type="button"
-          className="h-9 w-9 rounded-2xl grid place-items-center text-slate-500 bg-white/70 hover:bg-white ring-1 ring-black/[0.06] shadow-[0_12px_28px_-24px_rgba(15,23,42,0.55)] transition-colors active:scale-[0.98]"
-          aria-label="More"
-        >
-          <MoreIcon />
-        </button>
+        <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5">
+          {(
+            [
+              ['daily', '1D'],
+              ['weekly', '7D'],
+              ['monthly', '1M'],
+            ] as const
+          ).map(([id, label]) => {
+            const activeTab = range === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setRange(id)}
+                disabled={isLoading || isError}
+                className={[
+                  'px-2 py-0.5 rounded-md text-[10px] font-bold transition-all',
+                  activeTab ? 'bg-white text-slate-900 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50',
+                  isLoading || isError ? 'opacity-50 cursor-not-allowed' : '',
+                ].join(' ')}
+                aria-pressed={activeTab}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="mt-3 w-full flex items-center gap-1 rounded-2xl bg-white/70 backdrop-blur ring-1 ring-black/[0.06] shadow-[0_10px_26px_-22px_rgba(15,23,42,0.45)] p-0.5">
-        {(
-          [
-            ['daily', 'Daily'],
-            ['weekly', 'Weekly'],
-            ['monthly', 'Monthly'],
-          ] as const
-        ).map(([id, label]) => {
-          const activeTab = range === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setRange(id)}
-              disabled={isLoading || isError}
-              className={[
-                'flex-1 px-2.5 py-1 rounded-2xl text-[11px] leading-4 font-semibold transition-all whitespace-nowrap text-center',
-                activeTab
-                  ? 'bg-white text-slate-950 shadow-sm ring-1 ring-black/[0.06] translate-y-[-0.5px]'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-white/60',
-                isLoading || isError ? 'opacity-60 cursor-not-allowed hover:bg-transparent hover:text-slate-500' : '',
-              ].join(' ')}
-              aria-pressed={activeTab}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-3 items-stretch">
-        <div className="rounded-2xl bg-white ring-1 ring-black/[0.06] shadow-[0_16px_34px_-26px_rgba(15,23,42,0.55)] p-3 flex flex-col min-w-0">
-          <div className="text-[10px] font-extrabold tracking-wide text-slate-400">TOTAL</div>
-          <div className="mt-1 text-[22px] md:text-[24px] leading-[28px] font-semibold text-slate-950 tabular-nums tracking-[-0.03em] truncate">
-            {isLoading ? (
-              <span className="inline-flex items-center"><span className="kpi-loader" aria-label="Loading" /></span>
-            ) : isError ? (
-              <span className="text-rose-600">Unable to load</span>
-            ) : isEmpty ? (
-              <span className="text-slate-500">No data</span>
-            ) : (
-              formatFromBase(currentTotal)
-            )}
-          </div>
-
-          {!isLoading && !isError && !isEmpty ? (
-            <div className="mt-2">
-              <TrendBadge pct={trendPct} tone={trendTone} />
+      <div className="mt-3 flex justify-between gap-3 flex-1 h-full">
+        <div className="flex flex-col min-w-0 flex-1 justify-between h-full">
+          <div>
+            <div className="text-[10px] font-semibold tracking-wide text-slate-500">TOTAL</div>
+            <div className="mt-0.5 text-[18px] md:text-[20px] leading-[24px] font-bold text-slate-900 tabular-nums tracking-tight truncate">
+              {isLoading ? (
+                <span className="inline-flex items-center"><span className="kpi-loader" aria-label="Loading" style={{width: 18, height: 18, borderWidth: 2}} /></span>
+              ) : isError ? (
+                <span className="text-rose-600">Error</span>
+              ) : isEmpty ? (
+                <span className="text-slate-500">No data</span>
+              ) : (
+                formatFromBase(currentTotal)
+              )}
             </div>
-          ) : null}
 
-          <div className="mt-auto pt-3">
-            <Sparkline values={sparkByRange[range]} tone={trendTone === 'down' ? 'emerald' : 'rose'} />
+            {!isLoading && !isError && !isEmpty ? (
+              <div className="mt-1">
+                <TrendBadge pct={trendPct} tone={trendTone} />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-2 max-w-[100px] h-[32px] flex items-end">
+            {showChart && <Sparkline values={sparkByRange[range]} tone={trendTone === 'down' ? 'emerald' : 'rose'} />}
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white ring-1 ring-black/[0.06] shadow-[0_16px_34px_-26px_rgba(15,23,42,0.55)] p-3 flex flex-col items-center justify-center min-w-0">
-          <div className="w-full aspect-square max-w-[140px] min-w-0">
+        <div className="flex flex-col items-center justify-between shrink-0 w-[110px] h-full">
+          <div className="w-full aspect-square">
             <DonutChart
               data={active.data}
               centerLabelTop={isEmpty ? 'No data' : isRangeEmpty ? '' : topCategory}
               centerLabelBottom={isEmpty ? '—' : formatFromBase(isRangeEmpty ? 0 : active.center.amount)}
             />
           </div>
-          <div className="mt-1 text-[12px] font-semibold text-slate-800 truncate">{topCategory || '—'}</div>
-          <div className="mt-0.5 text-[11px] text-slate-400 font-semibold">Largest category</div>
+          <div className="mt-2 text-[10px] font-semibold text-slate-600 truncate w-full text-center h-[14px]">
+            {showChart ? topCategory : ''}
+          </div>
         </div>
       </div>
     </div>
