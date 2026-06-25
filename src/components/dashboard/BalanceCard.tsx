@@ -5,6 +5,15 @@ import { useExpenseContext } from '../../contexts/ExpenseContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import AnimatedKpiValue from './AnimatedKpiValue';
 
+function WalletIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M21 12V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M16 12h5v4h-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 const BalanceCard = () => {
   const { netBalance, getMonthlyData, transactions } = useExpenseContext();
   const { formatFromBase } = useCurrency();
@@ -292,9 +301,17 @@ const BalanceCard = () => {
   };
 
   return (
-    <div className="kpi-card">
-      <div className="kpi-header">
-        <div className="kpi-title">My balance</div>
+    <div className="kpi-card relative group hover:shadow-lg transition-all duration-300 ring-1 ring-black/[0.04] bg-white">
+      <div className="flex items-center justify-between gap-3 relative z-10">
+        <div className="flex items-center gap-2.5">
+          <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-600 grid place-items-center ring-1 ring-blue-500/10 transition-all duration-300 group-hover:bg-blue-100">
+            <WalletIcon />
+          </div>
+          <div>
+            <div className="text-[12px] font-bold text-slate-600 tracking-tight uppercase">MY BALANCE</div>
+            <div className="mt-0.5 text-[10px] text-slate-400 font-semibold">Current total</div>
+          </div>
+        </div>
         <button
           type="button"
           className="h-9 w-9 rounded-xl grid place-items-center bg-slate-50 text-slate-700 ring-1 ring-slate-200/80 shadow-sm hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30"
@@ -309,7 +326,7 @@ const BalanceCard = () => {
         </button>
       </div>
 
-      <div className="kpi-value flex items-center min-h-[40px]">
+      <div className="kpi-value flex items-center">
         <AnimatedKpiValue
           value={Number(netBalance) || 0}
           formatValue={formatFromBase}
@@ -319,40 +336,16 @@ const BalanceCard = () => {
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-start">
+      <div className="mt-auto pt-2 flex items-center gap-1.5 text-[12px]">
         {isLoading ? (
-          <span className="chip bg-slate-100 text-slate-500 ring-black/5">Loading</span>
+          <span className="text-[10px] text-slate-400 font-semibold">Loading...</span>
         ) : (
-          <span
-            className={[
-              'inline-flex items-center gap-2 rounded-2xl px-3 py-2 ring-1 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.55)]',
-              delta.positive ? 'bg-emerald-50/80 text-emerald-800 ring-emerald-200/70' : 'bg-rose-50/80 text-rose-800 ring-rose-200/70',
-            ].join(' ')}
-            aria-label="Compared to previous month"
-          >
-            <span
-              className={[
-                'grid h-6 w-6 place-items-center rounded-xl text-white ring-1',
-                delta.positive ? 'bg-emerald-600 ring-emerald-500/40' : 'bg-rose-600 ring-rose-500/40',
-              ].join(' ')}
-              aria-hidden="true"
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4">
-                {delta.positive ? (
-                  <path fill="currentColor" d="M7 14l5-5 5 5 1.4-1.4-6.4-6.4-6.4 6.4L7 14z" />
-                ) : (
-                  <path fill="currentColor" d="M7 10l5 5 5-5 1.4 1.4-6.4 6.4-6.4-6.4L7 10z" />
-                )}
-              </svg>
+          <>
+            <span className={['font-bold text-[10px]', delta.positive ? 'text-emerald-600' : 'text-rose-600'].join(' ')}>
+              {delta.positive ? '▲' : '▼'} {delta.pct >= 0 ? '+' : '−'}{Math.abs(delta.pct).toFixed(1)}%
             </span>
-            <span className="flex flex-col leading-tight">
-              <span className="text-[12px] font-extrabold tracking-tight">
-                {delta.pct >= 0 ? '+' : '−'}
-                {Math.abs(delta.pct).toFixed(1)}%
-              </span>
-              <span className="text-[10px] font-semibold opacity-80">Compared to previous month</span>
-            </span>
-          </span>
+            <span className="text-[10px] font-semibold text-slate-400 tracking-tight">vs last month</span>
+          </>
         )}
       </div>
 

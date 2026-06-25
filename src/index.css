@@ -1,4 +1,5 @@
 @tailwind base;
+@import 'leaflet/dist/leaflet.css';
 @tailwind components;
 @tailwind utilities;
 
@@ -13,6 +14,17 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+}
+
+.leaflet-container {
+  z-index: 0;
+  font-family: inherit;
+}
+.custom-leaflet-marker {
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* Prefer modern dynamic viewport units on mobile (prevents 100vh “address-bar” jumps). */
@@ -34,36 +46,27 @@ body {
   color: var(--text-color, #0F172A);
 }
 
-/* Ionic defaults often disable document scrolling (expects IonContent). This app uses
-   standard div layouts, so ensure the document can scroll normally. */
 html,
 body {
-  height: auto !important;
-  overflow: auto !important;
-  overflow-x: hidden !important;
+  height: 100dvh !important;
   width: 100%;
-  overscroll-behavior-x: none;
+  overflow: hidden !important;
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
+  background: var(--bg-color, #F8FAFC);
 }
+
 #root,
 ion-app {
-  height: auto !important;
-  min-height: var(--app-height, 100vh);
-  overflow: visible !important;
-}
-
-/* If an Ionic layout rule or a leaked scroll-lock left body fixed, force it back. */
-body {
-  position: static !important;
-}
-
-/* Keep `ion-app` from becoming a nested scroll container (can cause iOS blank gaps / clipped content). */
-ion-app {
-  min-height: var(--app-height, 100vh);
-  height: auto !important;
-  overflow: visible !important;
+  height: 100% !important;
+  width: 100%;
+  overflow-y: auto !important;
   overflow-x: hidden !important;
-  contain: none !important;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
 /* Reduce GPU pressure during initial load/refresh. App enables `data-app-ready="1"` shortly after first paint. */
@@ -373,8 +376,8 @@ body.landing-root-lock::-webkit-scrollbar {
 
   /* Compact KPI cards (top-row metrics) */
   .kpi-card {
-    @apply surface surface-pressable p-3 sm:p-4;
-    @apply min-h-[176px] sm:h-[184px];
+    @apply surface surface-pressable p-3.5 sm:p-4 flex flex-col;
+    @apply h-full;
   }
   .kpi-header {
     @apply flex items-start justify-between gap-3;

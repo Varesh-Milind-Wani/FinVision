@@ -8,6 +8,7 @@ type Props = {
   deltaLabel: string;
   deltaTone: 'up' | 'down' | 'neutral';
   iconTone: 'emerald' | 'orange' | 'violet';
+  icon?: React.ReactNode;
   isLoading?: boolean;
   deltaVariant?: 'text' | 'badge';
   sparkline?: number[];
@@ -31,9 +32,9 @@ const toneStyles = {
 } as const;
 
 const iconStyles = {
-  emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-  orange: 'bg-orange-50 text-orange-700 ring-orange-100',
-  violet: 'bg-violet-50 text-violet-700 ring-violet-100',
+  emerald: 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-[0_8px_16px_-6px_rgba(16,185,129,0.5)] ring-1 ring-emerald-500/30 ring-inset',
+  orange: 'bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_8px_16px_-6px_rgba(249,115,22,0.5)] ring-1 ring-orange-500/30 ring-inset',
+  violet: 'bg-gradient-to-br from-violet-400 to-violet-600 text-white shadow-[0_8px_16px_-6px_rgba(139,92,246,0.5)] ring-1 ring-violet-500/30 ring-inset',
 } as const;
 
 const SummaryCard = ({
@@ -42,6 +43,7 @@ const SummaryCard = ({
   deltaLabel,
   deltaTone,
   iconTone,
+  icon,
   isLoading = false,
   deltaVariant = 'text',
   sparkline,
@@ -357,17 +359,17 @@ const SummaryCard = ({
     const tone = negative && !positive ? 'down' : positive ? 'up' : 'neutral';
     const container =
       tone === 'up'
-        ? 'bg-emerald-50/80 text-emerald-800 ring-emerald-200/70'
+        ? 'bg-emerald-50/80 text-emerald-800 ring-emerald-200/70 shadow-[0_4px_12px_-4px_rgba(16,185,129,0.25)] backdrop-blur-sm'
         : tone === 'down'
-          ? 'bg-rose-50/80 text-rose-800 ring-rose-200/70'
-          : 'bg-slate-50/80 text-slate-800 ring-slate-200/70';
+          ? 'bg-rose-50/80 text-rose-800 ring-rose-200/70 shadow-[0_4px_12px_-4px_rgba(225,29,72,0.25)] backdrop-blur-sm'
+          : 'bg-slate-50/80 text-slate-800 ring-slate-200/70 shadow-[0_4px_12px_-4px_rgba(100,116,139,0.25)] backdrop-blur-sm';
 
     const icon =
       tone === 'up'
-        ? 'bg-emerald-600 ring-emerald-500/40'
+        ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 ring-emerald-500/40 text-white shadow-sm'
         : tone === 'down'
-          ? 'bg-rose-600 ring-rose-500/40'
-          : 'bg-slate-700 ring-slate-500/30';
+          ? 'bg-gradient-to-br from-rose-500 to-rose-600 ring-rose-500/40 text-white shadow-sm'
+          : 'bg-gradient-to-br from-slate-600 to-slate-700 ring-slate-500/30 text-white shadow-sm';
 
     return (
       <span
@@ -396,42 +398,54 @@ const SummaryCard = ({
   };
 
   return (
-    <div className="kpi-card">
-      <div className="kpi-header">
-        <div className="min-w-0">
-          <div className="kpi-title">{title}</div>
-          <div className="kpi-value min-h-[40px] flex items-center">{value}</div>
-          {isLoading ? (
-            <div className="mt-1 h-3 w-[72%] max-w-[220px] rounded-full bg-slate-100 ring-1 ring-black/5 animate-pulse" aria-hidden="true" />
-          ) : deltaLabel ? (
-            deltaVariant === 'badge' ? (
-              <DeltaBadge />
-            ) : (
-              <div className={`kpi-sub ${toneStyles[deltaTone]}`}>{deltaLabel}</div>
-            )
-          ) : null}
+    <div className="kpi-card relative group hover:shadow-lg transition-all duration-300 ring-1 ring-black/[0.04] bg-white flex flex-col h-full">
+      <div className="flex items-center justify-between gap-3 relative z-10">
+        <div className="flex items-center gap-2.5">
+          <div className={`h-9 w-9 rounded-xl grid place-items-center ring-1 transition-all duration-300 ${
+            iconTone === 'emerald' ? 'bg-emerald-50 text-emerald-600 ring-emerald-500/10 group-hover:bg-emerald-100' :
+            iconTone === 'orange' ? 'bg-orange-50 text-orange-600 ring-orange-500/10 group-hover:bg-orange-100' :
+            iconTone === 'violet' ? 'bg-violet-50 text-violet-600 ring-violet-500/10 group-hover:bg-violet-100' :
+            'bg-slate-50 text-slate-600 ring-slate-500/10 group-hover:bg-slate-100'
+          }`}>
+            {icon ? React.cloneElement(icon as React.ReactElement, { className: 'h-4 w-4' }) : null}
+          </div>
+          <div>
+            <div className="text-[12px] font-bold text-slate-600 tracking-tight uppercase">{title}</div>
+            <div className="mt-0.5 text-[10px] text-slate-400 font-semibold">{footerLabel === null ? 'Current total' : footerLabel || 'Last 30 days'}</div>
+          </div>
         </div>
 
         {modal ? (
           <button
             type="button"
             onClick={() => setChartOpen(true)}
-            className={`h-10 w-10 rounded-2xl ring-1 grid place-items-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
-              isLoading ? 'bg-slate-100 text-slate-500 ring-black/5' : `${iconStyles[iconTone]} hover:bg-white`
-            }`}
-            aria-label={`Open ${modal.title}`}
+            className="h-9 w-9 rounded-xl grid place-items-center bg-slate-50 text-slate-700 ring-1 ring-slate-200/80 shadow-sm hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30"
           >
-            <div className={`h-3.5 w-3.5 rounded ${isLoading ? 'bg-slate-400/60' : 'bg-current opacity-90'}`} />
+            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+              <circle cx="7" cy="12" r="2" fill="currentColor" />
+              <circle cx="12" cy="12" r="2" fill="currentColor" />
+              <circle cx="17" cy="12" r="2" fill="currentColor" />
+            </svg>
           </button>
-        ) : (
-          <div
-            className={`h-10 w-10 rounded-2xl ring-1 grid place-items-center ${
-              isLoading ? 'bg-slate-100 text-slate-500 ring-black/5' : iconStyles[iconTone]
-            }`}
-          >
-            <div className={`h-3.5 w-3.5 rounded ${isLoading ? 'bg-slate-400/60' : 'bg-current opacity-90'}`} />
+        ) : null}
+      </div>
+
+      <div className="mt-2">
+        <div className="text-[24px] sm:text-[26px] leading-[30px] sm:leading-[32px] font-semibold tracking-[-0.03em] text-slate-950 tabular-nums">
+          {value}
+        </div>
+        {isLoading ? (
+          <div className="mt-1 h-3 w-[72%] max-w-[220px] rounded-full bg-slate-100 ring-1 ring-black/5 animate-pulse" aria-hidden="true" />
+        ) : deltaLabel && !spark ? (
+          <div className="mt-auto pt-2 flex items-center gap-1.5 text-[12px]">
+            <span className={['font-bold text-[10px]', deltaTone === 'up' || (deltaTone === 'neutral' && parsedDelta?.pctText.startsWith('+')) ? 'text-emerald-600' : deltaTone === 'down' || (deltaTone === 'neutral' && parsedDelta?.pctText.startsWith('−')) ? 'text-rose-600' : 'text-slate-600'].join(' ')}>
+              {deltaTone === 'up' ? '▲' : deltaTone === 'down' ? '▼' : ''} {parsedDelta?.pctText}
+            </span>
+            <span className="text-[10px] font-semibold text-slate-400 tracking-tight">
+              {parsedDelta?.caption}
+            </span>
           </div>
-        )}
+        ) : null}
       </div>
 
       {sparklineVariant === 'inline' && spark ? (
@@ -447,24 +461,31 @@ const SummaryCard = ({
             ) : null}
           </svg>
         </div>
-      ) : (
-        <div className={`mt-auto pt-3 flex items-end gap-3 ${footerLabel === null ? 'justify-end' : 'justify-between'}`}>
-          {footerLabel === null ? null : <span className="chip">{footerLabel || 'Last 30 days'}</span>}
-          {spark ? (
+      ) : spark ? (
+        <div className="mt-auto pt-2">
+          <div className="w-full overflow-hidden flex justify-end">
             <svg width={spark.w} height={spark.h} viewBox={`0 0 ${spark.w} ${spark.h}`} className="shrink-0" aria-hidden="true">
-              {sparklineLabel ? (
-                <text x="6" y="12" className="fill-slate-500" fontSize="9" fontWeight="600">
-                  {sparklineLabel}
-                </text>
-              ) : null}
+              <defs>
+                <linearGradient id={`grad-${title.replace(/\s+/g, '')}`} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor={sparkStroke} stopOpacity="0.4" />
+                  <stop offset="50%" stopColor={sparkStroke} stopOpacity="1" />
+                  <stop offset="100%" stopColor={sparkStroke} stopOpacity="0.2" />
+                </linearGradient>
+              </defs>
               <path d={spark.area} fill={sparkFill} />
-              <path d={spark.d} fill="none" stroke={sparkStroke} strokeWidth="2.25" strokeLinecap="round" />
+              <path d={spark.d} fill="none" stroke={`url(#grad-${title.replace(/\s+/g, '')})`} strokeWidth="2.8" strokeLinecap="round" className="transition-all duration-500 group-hover:stroke-3" />
             </svg>
-          ) : (
-            (emptyRightLabel === null ? null : <span className="chip">{emptyRightLabel}</span>)
-          )}
+          </div>
+          {deltaLabel ? (
+            <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
+              <span className="text-slate-500 tracking-tight">{deltaLabel.split(' ').slice(1).join(' ')}</span>
+              <span className={['font-bold', deltaTone === 'up' ? 'text-emerald-600' : deltaTone === 'down' ? 'text-rose-600' : 'text-slate-600'].join(' ')}>
+                {deltaTone === 'up' ? '▲' : deltaTone === 'down' ? '▼' : ''} {parsedDelta?.pctText}
+              </span>
+            </div>
+          ) : null}
         </div>
-      )}
+      ) : null}
 
       {chartOpen && modal
         ? createPortal(

@@ -19,53 +19,34 @@ export const lockBodyScroll = () => {
     };
   }
 
-  const body = document.body;
-  lockedScrollY = window.scrollY || window.pageYOffset || 0;
+  const root = document.getElementById('root');
+  if (!root) return () => {};
+  
+  lockedScrollY = root.scrollTop || 0;
 
   prevBodyStyles = {
-    position: body.style.position,
-    top: body.style.top,
-    left: body.style.left,
-    right: body.style.right,
-    width: body.style.width,
-    overflow: body.style.overflow,
-    paddingRight: body.style.paddingRight,
+    overflow: root.style.overflow,
+    paddingRight: root.style.paddingRight,
   };
 
   const scrollbarWidth = getScrollbarWidth();
-  body.style.position = 'fixed';
-  body.style.top = `-${lockedScrollY}px`;
-  body.style.left = '0';
-  body.style.right = '0';
-  body.style.width = '100%';
-  body.style.overflow = 'hidden';
-  if (scrollbarWidth) body.style.paddingRight = `${scrollbarWidth}px`;
+  root.style.overflow = 'hidden';
+  if (scrollbarWidth) root.style.paddingRight = `${scrollbarWidth}px`;
 
   return () => {
     lockCount = Math.max(0, lockCount - 1);
     if (lockCount !== 0) return;
 
-    const nextBody = document.body;
     if (prevBodyStyles) {
-      nextBody.style.position = prevBodyStyles.position;
-      nextBody.style.top = prevBodyStyles.top;
-      nextBody.style.left = prevBodyStyles.left;
-      nextBody.style.right = prevBodyStyles.right;
-      nextBody.style.width = prevBodyStyles.width;
-      nextBody.style.overflow = prevBodyStyles.overflow;
-      nextBody.style.paddingRight = prevBodyStyles.paddingRight;
+      root.style.overflow = prevBodyStyles.overflow;
+      root.style.paddingRight = prevBodyStyles.paddingRight;
     } else {
-      nextBody.style.position = '';
-      nextBody.style.top = '';
-      nextBody.style.left = '';
-      nextBody.style.right = '';
-      nextBody.style.width = '';
-      nextBody.style.overflow = '';
-      nextBody.style.paddingRight = '';
+      root.style.overflow = '';
+      root.style.paddingRight = '';
     }
 
     prevBodyStyles = null;
-    window.scrollTo(0, lockedScrollY);
+    root.scrollTop = lockedScrollY;
   };
 };
 
@@ -74,39 +55,23 @@ export const forceUnlockBodyScroll = () => {
 
   lockCount = 0;
 
-  const body = document.body;
-  let y = lockedScrollY || window.scrollY || window.pageYOffset || 0;
-
-  try {
-    const top = body.style.top || '';
-    const n = parseInt(top, 10);
-    if (Number.isFinite(n) && n !== 0) y = Math.abs(n);
-  } catch {
-    // ignore
-  }
+  const root = document.getElementById('root');
+  if (!root) return;
+  
+  let y = lockedScrollY || root.scrollTop || 0;
 
   if (prevBodyStyles) {
-    body.style.position = prevBodyStyles.position;
-    body.style.top = prevBodyStyles.top;
-    body.style.left = prevBodyStyles.left;
-    body.style.right = prevBodyStyles.right;
-    body.style.width = prevBodyStyles.width;
-    body.style.overflow = prevBodyStyles.overflow;
-    body.style.paddingRight = prevBodyStyles.paddingRight;
+    root.style.overflow = prevBodyStyles.overflow;
+    root.style.paddingRight = prevBodyStyles.paddingRight;
   } else {
-    body.style.position = '';
-    body.style.top = '';
-    body.style.left = '';
-    body.style.right = '';
-    body.style.width = '';
-    body.style.overflow = '';
-    body.style.paddingRight = '';
+    root.style.overflow = '';
+    root.style.paddingRight = '';
   }
 
   prevBodyStyles = null;
 
   try {
-    window.scrollTo(0, y);
+    root.scrollTop = y;
   } catch {
     // ignore
   }
