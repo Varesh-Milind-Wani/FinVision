@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { useExpenseContext } from '../contexts/ExpenseContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useAmountsVisibility } from '../contexts/AmountsVisibilityContext';
-import { formatDate, formatTime12h } from '../utils/formatUtils';
+import { formatDate, formatTime12h, getCurrencySymbol } from '../utils/formatUtils';
 import { useBodyScrollLock } from '../utils/scrollLock';
 import TransactionForm from './TransactionForm';
+import ExportImport from './ExportImport';
 
 const FilterDropdown = ({ value, onChange, buttonLabel, sections = [], className = '' }) => {
   const [open, setOpen] = useState(false);
@@ -303,184 +304,110 @@ const TransactionItem = ({ transaction, selected, onToggleSelect, onEdit, onDele
     <div
       data-transaction-row="true"
       className={[
-        'group relative overflow-hidden rounded-2xl bg-white dark:bg-slate-950/35 shadow-soft ring-1 ring-slate-200/70 dark:ring-white/[0.12]',
-        'transition-[box-shadow,background-color,border-color] duration-200 ease-out',
-        'hover:bg-slate-50/70 dark:hover:bg-slate-950/55 hover:shadow-[0_14px_34px_-26px_rgba(15,23,42,0.28)]',
-        selected ? 'ring-2 ring-indigo-500/30 dark:ring-indigo-400/40' : 'hover:ring-slate-300/60 dark:hover:ring-white/[0.16]',
+        'group grid grid-cols-1 sm:grid-cols-12 items-center gap-4 py-4 px-4 sm:px-6 border-b border-slate-100 dark:border-white/5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/40 relative overflow-hidden',
+        selected ? 'bg-indigo-50/50 dark:bg-indigo-500/10' : '',
       ].join(' ')}
     >
-      <div className="p-4 sm:p-4.5">
-        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 sm:gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex-shrink-0">
-              <input
-                type="checkbox"
-                checked={!!selected}
-                onChange={(e) => {
-                  e.stopPropagation?.();
-                  onToggleSelect?.(transaction.id, e.target.checked);
-                }}
-                onClick={(e) => e.stopPropagation?.()}
-                aria-label={`Select transaction ${transaction.description}`}
-                className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 bg-white/90 dark:bg-slate-900/50 text-indigo-600 focus:ring-indigo-500/40"
-              />
-            </div>
-            <div
-              aria-hidden="true"
-              className={`h-9 w-9 rounded-2xl flex-shrink-0 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/[0.10] ${
-                transaction.type === 'income'
-                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
-                  : transaction.type === 'investment'
-                    ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-200'
-                    : 'bg-rose-500/10 text-rose-700 dark:text-rose-200'
-              }`}
-            >
-              {transaction.type === 'income' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clipRule="evenodd" />
-                </svg>
-              ) : transaction.type === 'investment' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M3 3a1 1 0 011-1h1a1 1 0 110 2H5v12h12v-1a1 1 0 112 0v2a1 1 0 01-1 1H4a1 1 0 01-1-1V3z" />
-                  <path d="M7 12a1 1 0 011-1h1a1 1 0 011 1v2H8a1 1 0 01-1-1v-1zM11 9a1 1 0 011-1h1a1 1 0 011 1v5h-2V9zM15 6a1 1 0 011-1h1a1 1 0 011 1v8h-2V6z" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
-                </svg>
-              )}
-            </div>
+      {/* Col 1: Transaction info (Logo, Checkbox, Details) */}
+      <div className="sm:col-span-4 flex items-center gap-4 min-w-0 z-10">
+        <input
+          type="checkbox"
+          checked={!!selected}
+          onChange={(e) => {
+            e.stopPropagation?.();
+            onToggleSelect?.(transaction.id, e.target.checked);
+          }}
+          onClick={(e) => e.stopPropagation?.()}
+          className="h-4.5 w-4.5 rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-indigo-600 focus:ring-indigo-500/40 cursor-pointer"
+        />
+        
+        {/* Merchant Logo Placeholder */}
+        <div
+          aria-hidden="true"
+          className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex-shrink-0 flex items-center justify-center bg-white dark:bg-slate-800 shadow-sm ring-1 ring-slate-200 dark:ring-white/10"
+        >
+          {transaction.type === 'income' ? (
+             <span className="text-xl">💰</span>
+          ) : transaction.type === 'investment' ? (
+             <span className="text-xl">📈</span>
+          ) : (
+             <span className="text-xl">🏢</span>
+          )}
+        </div>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <h3 className="font-display text-[15px] sm:text-base font-extrabold text-slate-900 dark:text-white truncate">
-                  {transaction.description}
-                </h3>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                <span className="inline-flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span className="tabular-nums">{formatDate(transaction.date)}</span>
-                  {transaction.time ? <span className="mx-2 text-slate-400 dark:text-slate-600">{'\u2022'}</span> : null}
-                  {transaction.time ? <span className="tabular-nums">{formatTime12h(transaction.time)}</span> : null}
-                </span>
-                <span
-                  className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1 ring-black/5 dark:ring-white/[0.10]"
-                  style={{ backgroundColor: typeBadge.bg, color: typeBadge.color }}
-                >
-                  {typeBadge.label}
-                </span>
-                <span
-                  className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1 ring-black/5 dark:ring-white/[0.10]"
-                  style={{ backgroundColor: categoryMeta.bg, color: categoryMeta.color }}
-                >
-                  {categoryMeta.label}
-                </span>
-                {investmentStatus ? (
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1 ring-black/5 dark:ring-white/[0.10] bg-slate-100/80 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
-                    {investmentStatus}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
+        <div className="min-w-0 flex flex-col">
+          <span className="font-display text-[15px] font-bold text-slate-900 dark:text-white truncate">
+            {transaction.description || 'Untitled Transaction'}
+          </span>
+          <span className="text-[13px] text-slate-500 dark:text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {transaction.merchant || 'Unknown Merchant'}
+          </span>
+        </div>
+      </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-3 min-w-0">
-            <div className="min-w-0 flex flex-col items-end text-right">
-              <span
-                title={amountText}
-                className={`min-w-0 text-right text-[16px] sm:text-[18px] font-extrabold tabular-nums truncate ${
-                  transaction.type === 'income'
-                    ? 'text-emerald-700 dark:text-emerald-300'
-                    : transaction.type === 'investment'
-                      ? 'text-blue-700 dark:text-blue-300'
-                      : 'text-rose-700 dark:text-rose-300'
-                }`}
-              >
-                {amountText}
-              </span>
-              {investmentPL ? (
-                <div
-                  className={`mt-0.5 text-xs font-semibold tabular-nums ${
-                    investmentPL.profit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'
-                  }`}
-                >
-                  {(() => {
-                    const sign = investmentPL.profit >= 0 ? '+' : '−';
-                    const profitText = amountsHidden ? `${sign} ${maskedText}` : `${sign} ${formatFromBase(Math.abs(investmentPL.profit), 'en-US')}`;
-                    const pctText =
-                      !amountsHidden && investmentPL.pct != null
-                        ? ` (${sign}${Math.abs(investmentPL.pct).toFixed(2)}%)`
-                        : '';
-                    return `P/L ${profitText}${pctText}`;
-                  })()}
-                </div>
-              ) : null}
-              {!investmentPL && transaction.type === 'investment' && investmentLive?.pnl != null ? (
-                <div
-                  className={`mt-0.5 text-xs font-semibold tabular-nums ${
-                    investmentLive.pnl >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'
-                  }`}
-                >
-                  {(() => {
-                    const sign = investmentLive.pnl >= 0 ? '+' : '−';
-                    const pnlText = amountsHidden ? `${sign} ${maskedText}` : `${sign} ${formatFromBase(Math.abs(investmentLive.pnl), 'en-US')}`;
-                    return `Unrealized ${pnlText}`;
-                  })()}
-                </div>
-              ) : null}
-            </div>
-            <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation?.();
-                  console.log("Transaction item - Editing transaction:", transaction);
-                  onEdit(transaction);
-                }}
-                className="btn-icon-ghost"
-                aria-label="Edit transaction"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation?.();
-                  onDelete?.(transaction);
-                }}
-                className="btn-icon-ghost"
-                aria-label="Delete transaction"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
-          </div>
+      {/* Col 2: Date & Status */}
+      <div className="hidden sm:flex sm:col-span-2 flex-col justify-center min-w-0 z-10">
+        <div className="font-semibold text-[13px] text-slate-700 dark:text-slate-300">{formatDate(transaction.date)}</div>
+        {transaction.time && <div className="mt-0.5 text-[12px] text-slate-500">{formatTime12h(transaction.time)}</div>}
+        <div className="mt-1.5 inline-flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Completed</span>
+        </div>
+      </div>
 
-          <div className="flex sm:hidden items-center justify-end gap-2 pt-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation?.();
-                onEdit(transaction);
-              }}
-              className="px-3 py-2 rounded-xl text-sm font-semibold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200"
-            >
-              Edit
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation?.();
-                onDelete?.(transaction);
-              }}
-              className="px-3 py-2 rounded-xl text-sm font-semibold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-rose-700 dark:text-rose-300"
-            >
-              Delete
-            </button>
-          </div>
+      {/* Col 3: Category */}
+      <div className="hidden sm:flex sm:col-span-2 items-center min-w-0 z-10">
+        <span
+          className="inline-flex items-center px-3 py-1.5 rounded-lg text-[12px] font-bold tracking-wide"
+          style={{ backgroundColor: categoryMeta.bg, color: categoryMeta.color }}
+        >
+          {categoryMeta.label}
+        </span>
+      </div>
+
+      {/* Col 4: Account & Payment Method */}
+      <div className="hidden sm:flex sm:col-span-2 flex-col justify-center min-w-0 z-10">
+         <span className="font-semibold text-[13px] text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+           <svg viewBox="0 0 24 24" className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+           {transaction.account || 'HDFC Bank'}
+         </span>
+         <span className="mt-0.5 text-[12px] text-slate-500">•••• 1234</span>
+      </div>
+
+      {/* Col 5: Amount & Actions */}
+      <div className="sm:col-span-2 flex items-center justify-between sm:justify-end gap-4 min-w-0 relative z-10">
+        <div className="flex flex-col items-end group-hover:-translate-x-[4.5rem] transition-transform duration-300 bg-white/0 dark:bg-slate-950/0">
+          <span
+            title={amountText}
+            className={`font-display text-[16px] font-extrabold tabular-nums truncate ${
+              transaction.type === 'income'
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : transaction.type === 'investment'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-900 dark:text-white'
+            }`}
+          >
+            {amountText}
+          </span>
+        </div>
+        
+        {/* Hover Actions (Absolute positioned to slide in) */}
+        <div className="absolute right-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 gap-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-2 py-1 rounded-xl ring-1 ring-slate-200/50 dark:ring-white/10 shadow-sm translate-x-4 group-hover:translate-x-0">
+          <button
+            onClick={(e) => { e.stopPropagation?.(); onEdit(transaction); }}
+            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors"
+            title="Edit"
+          >
+            <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation?.(); onDelete?.(transaction); }}
+            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
+            title="Delete"
+          >
+            <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -901,8 +828,8 @@ const EmptyState = () => (
   </div>
 );
 
-const TransactionList = () => {
-  const { transactions, deleteTransaction, deleteTransactions } = useExpenseContext();
+const TransactionList = ({ onOpenTransactionModal, onOpenMapModal }) => {
+  const { transactions, totalIncome, totalExpenses, netBalance, deleteTransaction, deleteTransactions } = useExpenseContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -911,11 +838,14 @@ const TransactionList = () => {
   const [pageInput, setPageInput] = useState('1');
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [showExportImportModal, setShowExportImportModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState([]);
   const { categories } = useExpenseContext();
+  const { formatFromBase } = useCurrency();
 
   useBodyScrollLock(isModalOpen || !!selectedTransaction || deleteModalOpen);
   const incomeCategories = useMemo(
@@ -1129,48 +1059,114 @@ const TransactionList = () => {
   };
 
   return (
-    <div className="p-4 sm:p-5 md:p-6 h-full min-h-0 flex flex-col animate-float-in">
-      <div className="mb-4 sm:mb-6 space-y-3 sm:space-y-0">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-2">
-          <div className="relative w-full sm:w-72">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    <div className="flex flex-col gap-6 animate-float-in h-full min-h-0">
+      
+      {/* Page Header & KPIs */}
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h1 className="font-display text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Transactions</h1>
+            <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400 font-medium">Manage, categorize, and analyze your financial activity.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={() => setShowExportImportModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap active:scale-[0.98]">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+              Import/Export Data
+            </button>
+            <button onClick={onOpenMapModal} className="flex items-center gap-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap active:scale-[0.98]">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              Map
+            </button>
+            <button onClick={onOpenTransactionModal} className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-indigo-600 to-blue-600 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all whitespace-nowrap active:scale-[0.98]">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              New Transaction
+            </button>
+          </div>
+        </div>
+
+        {/* Top KPI Cards — 2×2 on mobile, 4-col on lg */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Total Income', value: totalIncome, color: '#059669', bg: 'rgba(5,150,105,0.07)', border: 'rgba(5,150,105,0.15)', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+            { label: 'Total Expenses', value: totalExpenses, color: '#e11d48', bg: 'rgba(225,29,72,0.07)', border: 'rgba(225,29,72,0.15)', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z' },
+            { label: 'Net Balance', value: netBalance, color: '#2563eb', bg: 'rgba(37,99,235,0.07)', border: 'rgba(37,99,235,0.15)', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+            { label: 'Transactions', value: transactions.length, raw: true, color: '#7c3aed', bg: 'rgba(124,58,237,0.07)', border: 'rgba(124,58,237,0.15)', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+          ].map((kpi, i) => (
+            <div
+              key={i}
+              style={{
+                background: '#ffffff',
+                borderRadius: '16px',
+                border: `1px solid ${kpi.border}`,
+                padding: '14px 14px 12px 14px',
+                boxShadow: `0 1px 3px rgba(0,0,0,0.04), 0 4px 12px ${kpi.bg}`,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Accent orb */}
+              <div aria-hidden="true" style={{ position: 'absolute', top: '-10px', right: '-10px', width: '60px', height: '60px', borderRadius: '50%', background: `radial-gradient(circle, ${kpi.bg} 0%, transparent 70%)`, pointerEvents: 'none' }} />
+
+              {/* Icon + label row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg style={{ width: '14px', height: '14px', color: kpi.color }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={kpi.icon} />
+                  </svg>
+                </div>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 1.2 }}>{kpi.label}</div>
+              </div>
+
+              {/* Value */}
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {kpi.raw ? kpi.value : formatFromBase(kpi.value)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Advanced Filter Panel */}
+      <div className="flex flex-col bg-white/70 dark:bg-slate-900/40 backdrop-blur-md p-5 rounded-3xl ring-1 ring-slate-200/70 dark:ring-white/10 shadow-sm gap-4">
+        
+        {/* Row 1: Search & Primary Filters */}
+        <div className="flex flex-col xl:flex-row gap-3">
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             <input
               type="text"
-              placeholder="Search transactions..."
+              placeholder="Search by merchant, note, or amount..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-soft pl-10 pr-3"
+              className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-950/50 border-0 ring-1 ring-inset ring-slate-200 dark:ring-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-inset focus:ring-indigo-600 transition-shadow shadow-sm placeholder:text-slate-400"
             />
           </div>
-          
-          <div className="flex flex-row items-center justify-between sm:justify-end gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button className="flex items-center gap-2 px-3.5 py-3 bg-white dark:bg-slate-950/50 border-0 ring-1 ring-inset ring-slate-200 dark:ring-white/10 rounded-2xl text-sm font-semibold text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 transition-colors">
+              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+              <span>This Month</span>
+            </button>
+
             <FilterDropdown
               value={filterType}
               onChange={setFilterType}
-              buttonLabel={
-                filterType === 'all' ? 'All Types' : filterType === 'income' ? 'Income' : filterType === 'investment' ? 'Investment' : 'Expense'
-              }
-              className={
-                filterType === 'investment'
-                  ? 'bg-blue-50 text-blue-700 ring-blue-200/80 hover:bg-blue-50/70 dark:bg-blue-500/10 dark:text-blue-200 dark:ring-blue-500/20 dark:hover:bg-blue-500/15'
-                  : ''
-              }
+              buttonLabel={filterType === 'all' ? 'All Accounts' : filterType === 'income' ? 'Income' : filterType === 'investment' ? 'Investment' : 'Expense'}
               sections={[
-                {
-                  id: 'types',
-                  label: null,
-                  options: [
-                    { value: 'all', label: 'All Types' },
+                { id: 'types', label: null, options: [
+                    { value: 'all', label: 'All Accounts' },
                     { value: 'income', label: 'Income' },
                     { value: 'expense', label: 'Expense' },
                     { value: 'investment', label: 'Investment' },
-                  ],
-                },
+                ]},
               ]}
+              className="px-3.5 py-3 bg-white dark:bg-slate-950/50 border-0 ring-1 ring-inset ring-slate-200 dark:ring-white/10 rounded-2xl text-sm font-semibold shadow-sm hover:bg-slate-50 transition-colors"
             />
 
             <FilterDropdown
@@ -1179,21 +1175,30 @@ const TransactionList = () => {
               buttonLabel={categoryLabelFor(filterCategory)}
               sections={[
                 { id: 'all', label: null, options: [{ value: 'all', label: 'All Categories' }] },
-                {
-                  id: 'income',
-                  label: 'Income',
-                  options: incomeCategories.map((c) => ({ value: c.id, label: c.name })),
-                },
-                {
-                  id: 'expense',
-                  label: 'Expenses',
-                  options: categories.map((c) => ({ value: c.id, label: c.name })),
-                },
+                { id: 'income', label: 'Income', options: incomeCategories.map((c) => ({ value: c.id, label: c.name })) },
+                { id: 'expense', label: 'Expenses', options: categories.map((c) => ({ value: c.id, label: c.name })) },
               ]}
-              className="min-w-[13rem]"
+              className="px-3.5 py-3 bg-white dark:bg-slate-950/50 border-0 ring-1 ring-inset ring-slate-200 dark:ring-white/10 rounded-2xl text-sm font-semibold shadow-sm hover:bg-slate-50 transition-colors min-w-[10rem]"
             />
+            
+            <button className="flex items-center gap-2 px-3.5 py-3 bg-white dark:bg-slate-950/50 border-0 ring-1 ring-inset ring-slate-200 dark:ring-white/10 rounded-2xl text-sm font-semibold text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 transition-colors">
+               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+               <span>More Filters</span>
+            </button>
           </div>
         </div>
+
+        {/* Quick Filter Chips */}
+        <div className="flex flex-wrap items-center gap-2 pt-3 mt-1 border-t border-slate-200/60 dark:border-white/10">
+          <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 py-1.5 pr-1">Quick Views:</span>
+          {['Needs Review', 'High Value', 'Subscriptions', 'Tax Deductible', 'Missing Receipt'].map((chip) => (
+             <button key={chip} className="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+               {chip}
+             </button>
+          ))}
+        </div>
+        
+        {/* Filter Badges Row */}
         
         {(searchTerm || filterType !== 'all' || filterCategory !== 'all') && (
           <div className="flex justify-between items-center bg-white/80 dark:bg-slate-900/45 p-2.5 sm:p-3 rounded-2xl ring-1 ring-slate-200/70 dark:ring-white/10 shadow-sm">
@@ -1277,11 +1282,48 @@ const TransactionList = () => {
         ) : null}
       </div>
 
-      <div ref={listViewportRef} className="flex-1 min-h-0 px-1 sm:px-2 pt-3 pb-2.5 overflow-y-auto scrollbar-hide">
-        {totalCount === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="space-y-3">
+      {/* Table Tools Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 px-1">
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
+            Sort
+          </button>
+          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+            Group
+          </button>
+          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
+            Columns
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+            Save View
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-950 rounded-3xl shadow-sm ring-1 ring-slate-200/70 dark:ring-white/[0.12] overflow-hidden">
+        {totalCount > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-12 items-center gap-4 py-3 px-4 sm:px-6 bg-slate-50/80 dark:bg-slate-900/40 border-b border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <div className="sm:col-span-4 flex items-center gap-4 pl-1">
+              <input type="checkbox" className="h-4.5 w-4.5 rounded-md border-slate-300 invisible" />
+              <span className="pl-14">Transaction</span>
+            </div>
+            <div className="hidden sm:block sm:col-span-2">Date</div>
+            <div className="hidden sm:block sm:col-span-2">Category</div>
+            <div className="hidden sm:block sm:col-span-2">Account</div>
+            <div className="sm:col-span-2 text-right pr-2">Amount</div>
+          </div>
+        )}
+        <div ref={listViewportRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-0 sm:px-2">
+          {totalCount === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="flex flex-col">
             {paginatedTransactions.map((transaction) => (
               <div
                 key={transaction.id}
@@ -1305,8 +1347,9 @@ const TransactionList = () => {
                 />
               </div>
             ))}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {totalCount > 0 && totalPages > 1 ? (
@@ -1444,8 +1487,34 @@ const TransactionList = () => {
             document.body
           )
         : null}
+
+      {showExportImportModal && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+           <div className="bg-slate-50 dark:bg-slate-950 rounded-3xl w-full max-w-4xl max-h-[75vh] flex flex-col overflow-hidden relative shadow-2xl ring-1 ring-black/5 dark:ring-white/10">
+              <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-black/5 dark:border-white/10 shrink-0 bg-white/90 dark:bg-slate-950/70">
+                <div className="min-w-0">
+                  <div className="font-display text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white truncate">Export & Import Data</div>
+                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Backup your transactions or restore from a file</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowExportImportModal(false)}
+                  className="shrink-0 h-9 w-9 rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.12] bg-slate-50/80 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-900/55 transition-colors grid place-items-center"
+                  aria-label="Close"
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4 sm:p-6 flex-1 overflow-y-auto scrollbar-hide">
+                <ExportImport />
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default TransactionList; 
+export default TransactionList;

@@ -44,34 +44,40 @@ const parseHyperData = (rawValue) => {
   const errors = [];
 
   tokens.forEach((token, index) => {
-    const firstDash = token.indexOf('-');
-    if (firstDash <= 0 || firstDash >= token.length - 1) {
-      errors.push(`"${token}" must use "amount-label" or "label-amount".`);
-      return;
-    }
-
-    const left = token.slice(0, firstDash).trim();
-    const right = token.slice(firstDash + 1).trim();
-
-    const leftAmount = parseHyperDataAmount(left);
-    const rightAmount = parseHyperDataAmount(right);
-
     let amount = null;
     let label = '';
+    let found = false;
 
-    if (leftAmount.ok && !rightAmount.ok) {
-      amount = leftAmount.value;
-      label = right;
-    } else if (!leftAmount.ok && rightAmount.ok) {
-      amount = rightAmount.value;
-      label = left;
-    } else if (leftAmount.ok && rightAmount.ok) {
-      amount = leftAmount.value;
-      label = right;
-    } else {
-      errors.push(`"${token}" is invalid. Use 20-Bus or Salary-5000.`);
+    for (let i = 1; i < token.length - 1; i++) {
+      if (token[i] === '-' || token[i] === ' ') {
+        const l = token.slice(0, i).trim();
+        const r = token.slice(i + 1).trim();
+        if (!l || !r) continue;
+
+        const lAmt = parseHyperDataAmount(l);
+        const rAmt = parseHyperDataAmount(r);
+
+        if (lAmt.ok && !rAmt.ok) {
+          amount = lAmt.value;
+          label = r;
+          found = true;
+          break;
+        } else if (!lAmt.ok && rAmt.ok) {
+          amount = rAmt.value;
+          label = l;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    if (!found) {
+      errors.push(`"${token}" is invalid. Use formats like "20 Chai" or "Grocery 500".`);
       return;
     }
+
+    // Clean up common natural language fillers
+    label = label.replace(/^(for|on)\s+/i, '').trim();
 
     if (!label) {
       errors.push(`"${token}" is missing a label.`);
@@ -648,6 +654,11 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
       newErrors.amount = 'Amount must be a positive number';
     }
     
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (formData.date > todayStr) {
+      newErrors.date = 'Date cannot be in the future';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -1524,9 +1535,17 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
           </div>
 
           <div className={embedded ? 'mb-3' : 'mb-4'}>
-            <label htmlFor="hyperData" className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
-              HyperData
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="hyperData" className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                HyperData
+                <span className="inline-flex items-center gap-1 rounded bg-gradient-to-r from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/20">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-purple-500">
+                    <path d="M11.983 1.907a.75.75 0 00-1.292-.52l-8.5 9.5A.75.75 0 002.75 12h6.572l-1.305 6.093a.75.75 0 001.292.52l8.5-9.5A.75.75 0 0017.25 8h-6.572l1.305-6.093z" />
+                  </svg>
+                  SMART INPUT
+                </span>
+              </label>
+            </div>
             <textarea
               id="hyperData"
               name="hyperData"
@@ -1536,12 +1555,12 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
                 embedded ? 'py-2' : 'py-2.5',
                 errors.hyperData ? 'ring-2 ring-rose-500/30 focus:ring-rose-500/40' : '',
               ].join(' ')}
-              placeholder={formData.type === 'income' ? 'Salary-5000, 1000-Stocks' : '20-Bus, 12-Chai, 1000-Shopping'}
+              placeholder={formData.type === 'income' ? 'Salary 5000, 1000 Stocks' : '20 Chai, 12 for Bus, 1000 Shopping'}
               value={formData.hyperData}
               onChange={handleChange}
             />
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <span>Use `amount-label` or `label-amount`.</span>
+              <span>Type naturally (e.g. "20 Chai" or "Grocery 500").</span>
               <span>Separate items with commas or new lines.</span>
             </div>
             {hyperDataHasRows && !errors.hyperData ? (
@@ -1679,6 +1698,12 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
               const iso = ddMmYyyyToIso(cleaned);
               if (iso) {
                 setFormData((prev) => ({ ...prev, date: iso }));
+                const todayStr = new Date().toISOString().split('T')[0];
+                if (iso > todayStr) {
+                  setErrors((prev) => ({ ...prev, date: 'Date cannot be in the future' }));
+                } else {
+                  setErrors((prev) => ({ ...prev, date: '' }));
+                }
               }
             }}
             onBlur={() => {
@@ -1712,9 +1737,17 @@ const TransactionForm = ({ editTransaction = null, onClose, variant = 'card', co
               const iso = e.target.value;
               setFormData((prev) => ({ ...prev, date: iso }));
               setDateText(isoToDdMmYyyy(iso));
+              
+              const todayStr = new Date().toISOString().split('T')[0];
+              if (iso > todayStr) {
+                setErrors((prev) => ({ ...prev, date: 'Date cannot be in the future' }));
+              } else {
+                setErrors((prev) => ({ ...prev, date: '' }));
+              }
             }}
           />
         </div>
+        {errors.date && <p className="text-red-500 text-xs mt-1">{errors.date}</p>}
       </div>
 
       <div className={[embedded ? 'mb-3' : 'mb-4', embedded ? 'pt-3' : 'pt-5'].join(' ')}>

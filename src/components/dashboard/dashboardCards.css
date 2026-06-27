@@ -1,0 +1,55 @@
+/* src/components/dashboard/dashboardCards.css */
+
+:root {
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --card-radius: 0.75rem;
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --card-hover-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  --transition: all 0.3s ease;
+  --primary: #2563eb;
+  /* blue-600 */
+  --secondary: #10b981;
+  /* emerald-500 */
+  --danger: #ef4444;
+  /* red-500 */
+}
+
+.card {
+  background: var(--card-bg);
+  backdrop-filter: blur(8px);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  transition: var(--transition);
+  overflow: hidden;
+}
+
+.card:hover {
+  box-shadow: var(--card-hover-shadow);
+}
+
+/* Responsive grid for dashboard */
+.dashboard-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* Utility tweaks */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+}
+
+.card-body {
+  padding: 0 1rem 1rem;
+}
+
+/* Mobile adjustments – convert row layouts to column */
+@media (max-width: 640px) {
+  .card .flex-row {
+    flex-direction: column !important;
+    align-items: flex-start;
+  }
+}

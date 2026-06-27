@@ -148,8 +148,6 @@ const CapsuleNav = ({ navItems, activeTab, onNavigate, onPreload, size = 'md' })
 
 const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
   const { currentUser, logout } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const closeTimerRef = useRef(0);
   const initials = useMemo(() => {
     const name = String(currentUser?.name || 'User').trim();
     return name
@@ -159,202 +157,254 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
       .join('') || 'U';
   }, [currentUser?.name]);
 
-  useBodyScrollLock(menuOpen);
-
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = 0;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!menuOpen) return undefined;
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') setMenuOpen(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [menuOpen]);
-
+  // 5 most-used tabs
   const navItems = useMemo(
     () => [
-      { id: 'dashboard', label: 'Dashboard' },
-      { id: 'transactions', label: 'Transactions' },
-      { id: 'charts', label: 'Analytics' },
-      { id: 'networth', label: 'Net Worth' },
-      { id: 'goals', label: 'Goals' },
+      { id: 'dashboard', label: 'Home', desktopLabel: 'Dashboard' },
+      { id: 'transactions', label: 'New', desktopLabel: 'Transactions' },
+      { id: 'budgets', label: 'Budgets', desktopLabel: 'Budgets' },
+      { id: 'charts', label: 'Analytics', desktopLabel: 'Analytics' },
+      { id: 'settings', label: 'Settings', desktopLabel: 'Settings' },
     ],
     []
   );
+  // Desktop uses full labels
+  const desktopNavItems = useMemo(() => navItems.map(i => ({ ...i, label: i.desktopLabel })), [navItems]);
 
-  const navigateFromMenu = useCallback(
-    (tab) => {
-      // Close immediately so the UI feels instant, then navigate on the next tick.
-      setMenuOpen(false);
-      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = window.setTimeout(() => {
-        startTransition(() => onNavigate?.(tab));
-      }, 0);
+  // Premium dual-state (outline / filled) icons — Lucide / SF-Symbol style
+  const NAV_ICONS = {
+    dashboard: {
+      outline: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
+          <path d="M9 21V12h6v9" />
+        </svg>
+      ),
+      filled: (
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.1L2 9.4V21a1 1 0 001 1h5v-9h8v9h5a1 1 0 001-1V9.4L12 2.1z" />
+        </svg>
+      ),
     },
-    [onNavigate]
-  );
+    transactions: {
+      outline: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 3L4 7l4 4M4 7h16" />
+          <path d="M16 21l4-4-4-4m4 4H4" />
+        </svg>
+      ),
+      filled: (
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8.707 2.293a1 1 0 00-1.414 0l-4 4a1 1 0 001.414 1.414L7 5.414V17a1 1 0 002 0V5.414l2.293 2.293a1 1 0 001.414-1.414l-4-4zM16 7a1 1 0 011 1v11.586l2.293-2.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L15 19.586V8a1 1 0 011-1z" />
+        </svg>
+      ),
+    },
+    budgets: {
+      outline: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2" />
+          <path d="M2 10h20" />
+          <path d="M6 15h2M10 15h2" />
+        </svg>
+      ),
+      filled: (
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path fillRule="evenodd" d="M2 7a3 3 0 013-3h14a3 3 0 013 3v10a3 3 0 01-3 3H5a3 3 0 01-3-3V7zm0 3h20v7a1 1 0 01-1 1H3a1 1 0 01-1-1v-7zm3 4a1 1 0 011-1h2a1 1 0 010 2H6a1 1 0 01-1-1zm6 0a1 1 0 011-1h2a1 1 0 010 2h-2a1 1 0 01-1-1z" clipRule="evenodd" />
+        </svg>
+      ),
+    },
+    charts: {
+      outline: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 20V13m4 7V9m4 11V5m4 15v-7" />
+          <path d="M2 20h20" />
+        </svg>
+      ),
+      filled: (
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M3 20a1 1 0 001 1h16a1 1 0 001-1v-1H3v1zM4 12h2v7H4v-7zm5-4h2v11H9V8zm5 5h2v6h-2v-6zm5-8h2v14h-2V5z" />
+        </svg>
+      ),
+    },
+    settings: {
+      outline: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+        </svg>
+      ),
+      filled: (
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 00-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 00-2.282.819l-.922 1.597a1.875 1.875 0 00.432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 000 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 00-.432 2.385l.922 1.597a1.875 1.875 0 002.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.57.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 002.28-.819l.923-1.597a1.875 1.875 0 00-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 000-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 00-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 00-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 00-1.85-1.567h-1.843zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" clipRule="evenodd" />
+        </svg>
+      ),
+    },
+  };
 
-  useEffect(() => {
-    if (!menuOpen) return undefined;
-
-    // Warm up route chunks/components for faster tap navigation on mobile.
-    const preload = () => {
-      try {
-        navItems.forEach((i) => onPreload?.(i.id));
-        onPreload?.('settings');
-      } catch {
-        // ignore
-      }
-    };
-
-    if (typeof window.requestIdleCallback === 'function') {
-      const id = window.requestIdleCallback(preload, { timeout: 800 });
-      return () => window.cancelIdleCallback?.(id);
-    }
-
-    const t = window.setTimeout(preload, 120);
-    return () => window.clearTimeout(t);
-  }, [menuOpen, navItems, onPreload]);
-
-  const mobileMenu = createPortal(
-    <div className={`fixed inset-0 z-[10010] md:hidden ${menuOpen ? '' : 'pointer-events-none'}`}>
+  const mobileBottomNav = (
+    <div
+      className="md:hidden fixed left-0 right-0 bottom-0 z-[100] pointer-events-none"
+      style={{
+        paddingBottom: 'max(16px, calc(12px + env(safe-area-inset-bottom)))',
+        paddingLeft: '14px',
+        paddingRight: '14px',
+      }}
+    >
+      {/* Soft ambient background bloom */}
       <div
         aria-hidden="true"
-        className={[
-          'absolute inset-0 bg-slate-950/55',
-          'transition-opacity duration-200 ease-out motion-reduce:transition-none',
-          menuOpen ? 'opacity-100' : 'opacity-0',
-        ].join(' ')}
-        onClick={() => setMenuOpen(false)}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Navigation menu"
-        className={[
-          'absolute right-0 top-0 h-full w-[min(360px,92vw)]',
-          'bg-white dark:bg-slate-950 shadow-2xl ring-1 ring-black/10 dark:ring-white/[0.12]',
-          'transition-transform duration-200 ease-out motion-reduce:transition-none will-change-transform',
-          menuOpen ? 'translate-x-0' : 'translate-x-full',
-        ].join(' ')}
         style={{
-          paddingTop: 'calc(1rem + var(--safe-area-inset-top))',
-          paddingBottom: 'calc(1rem + var(--safe-area-inset-bottom))',
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(to top, rgba(248,250,255,0.72) 0%, rgba(255,255,255,0.18) 70%, transparent 100%)',
+          pointerEvents: 'none',
         }}
-        onClick={(e) => e.stopPropagation()}
+      />
+
+      {/* Floating pill */}
+      <div
+        className="pointer-events-auto"
+        style={{
+          height: '72px',
+          borderRadius: '34px',
+          background: 'linear-gradient(170deg, rgba(255,255,255,0.94) 0%, rgba(246,248,255,0.90) 100%)',
+          backdropFilter: 'blur(48px) saturate(240%) brightness(1.05)',
+          WebkitBackdropFilter: 'blur(48px) saturate(240%) brightness(1.05)',
+          border: '1px solid rgba(255,255,255,0.80)',
+          boxShadow: [
+            '0 1px 3px rgba(0,0,0,0.04)',
+            '0 6px 20px rgba(0,0,0,0.08)',
+            '0 20px 44px rgba(0,0,0,0.07)',
+            'inset 0 1.5px 0 rgba(255,255,255,1)',
+            'inset 0 -1px 0 rgba(0,0,0,0.03)',
+          ].join(', '),
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 8px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
       >
-            <div className="px-4 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  navigateFromMenu('settings');
-                }}
-                className="flex items-center gap-3 min-w-0 text-left rounded-2xl p-2 -ml-2 hover:bg-white/60 dark:hover:bg-slate-900/35 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-                aria-label="Open settings"
-                title="Settings"
-              >
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 text-sm font-extrabold text-white">
-                  {initials}
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-extrabold text-slate-900 dark:text-white">{currentUser?.name || 'User'}</div>
-                  <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">{currentUser?.email || 'Local session'}</div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMenuOpen(false)}
-                className="h-10 w-10 rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.12] bg-white/70 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-900/55 transition-colors grid place-items-center"
-                aria-label="Close menu"
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
+        {/* Top shimmer line */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: '8%',
+            right: '8%',
+            height: '1px',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.95) 35%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.95) 65%, transparent 100%)',
+            borderRadius: '999px',
+            pointerEvents: 'none',
+          }}
+        />
 
-            <div className="mt-4 px-4">
-              <div className="rounded-2xl ring-1 ring-black/5 dark:ring-white/[0.12] bg-white/70 dark:bg-slate-950/25 overflow-hidden">
-                {navItems.map((item) => {
-                  const active = item.id === activeTab;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        navigateFromMenu(item.id);
-                      }}
-                      onMouseEnter={() => onPreload?.(item.id)}
-                      onTouchStart={() => onPreload?.(item.id)}
-                      className={[
-                        'w-full text-left px-4 py-3 flex items-center justify-between gap-3',
-                        'transition-colors',
-                        active
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-800 dark:text-slate-100 hover:bg-slate-100/80 dark:hover:bg-slate-900/40',
-                      ].join(' ')}
-                    >
-                      <span className="text-sm font-extrabold">{item.label}</span>
-                      {active ? (
-                        <span className="text-[11px] font-extrabold bg-white/15 rounded-full px-2 py-0.5 ring-1 ring-white/20">
-                          Active
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
+        {navItems.map((item) => {
+          const active = item.id === activeTab;
+          const icons = NAV_ICONS[item.id];
+          return (
+            <button
+              key={item.id}
+              onClick={() => onNavigate?.(item.id)}
+              onMouseEnter={() => onPreload?.(item.id)}
+              onTouchStart={() => onPreload?.(item.id)}
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                padding: '8px 4px 6px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                outline: 'none',
+                position: 'relative',
+                transition: 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                transform: active ? 'translateY(-2px) scale(1.06)' : 'translateY(0) scale(1)',
+              }}
+              aria-label={item.label}
+              aria-current={active ? 'page' : undefined}
+            >
+              {/* Soft active glow */}
+              {active && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: '6px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '40px',
+                    height: '32px',
+                    borderRadius: '14px',
+                    background: 'radial-gradient(ellipse at center, rgba(79,107,255,0.18) 0%, transparent 72%)',
+                    filter: 'blur(6px)',
+                    pointerEvents: 'none',
+                    transition: 'opacity 220ms ease',
+                  }}
+                />
+              )}
+
+              {/* Icon */}
+              <div
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  zIndex: 1,
+                  color: active ? '#4F6BFF' : '#9B9BA0',
+                  filter: active ? 'drop-shadow(0 2px 6px rgba(79,107,255,0.38))' : 'none',
+                  transition: 'color 220ms ease, filter 220ms ease, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  transform: active ? 'scale(1.14)' : 'scale(1)',
+                }}
+              >
+                {active ? icons.filled : icons.outline}
               </div>
-            </div>
 
-            <div className="mt-4 px-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  navigateFromMenu('settings');
+              {/* Label */}
+              <span
+                style={{
+                  fontSize: '10px',
+                  lineHeight: '1',
+                  letterSpacing: '-0.01em',
+                  fontWeight: active ? '700' : '500',
+                  color: active ? '#4F6BFF' : '#9B9BA0',
+                  transition: 'color 220ms ease',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif',
+                  userSelect: 'none',
+                  maxWidth: '58px',
+                  textAlign: 'center',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  position: 'relative',
+                  zIndex: 1,
                 }}
-                className="px-4 py-3 rounded-2xl text-sm font-extrabold ring-1 ring-black/5 dark:ring-white/[0.12] bg-white/70 dark:bg-slate-950/25 hover:bg-white dark:hover:bg-slate-950/35 transition-colors"
               >
-                Settings
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  logout?.();
-                  setMenuOpen(false);
-                }}
-                className="px-4 py-3 rounded-2xl text-sm font-extrabold ring-1 ring-black/5 dark:ring-white/[0.12] bg-white/70 dark:bg-slate-950/25 hover:bg-white dark:hover:bg-slate-950/35 transition-colors text-rose-700 dark:text-rose-300"
-              >
-                Logout
-              </button>
-            </div>
+                {item.label}
+              </span>
 
+
+            </button>
+          );
+        })}
       </div>
-    </div>,
-    document.body
+    </div>
   );
 
+
   return (
-    <header className="fixed inset-x-0 top-0 z-30 border-b border-black/[0.06] bg-white/70 supports-[backdrop-filter]:bg-white/55 backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150 ring-1 ring-black/[0.04] shadow-[0_14px_40px_-28px_rgba(15,23,42,0.45)] transition-colors duration-200">
-      <div className="mx-auto w-full max-w-[1520px] px-2 sm:px-5 lg:px-6 py-3 sm:py-3.5 grid grid-cols-[1fr_auto_1fr] md:grid-cols-[auto,1fr,auto] items-center gap-3">
-        <div className="flex items-center gap-2 flex-shrink-0 justify-self-start">
-          <button
-            type="button"
-            onClick={() => setMenuOpen(true)}
-            className="md:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            aria-label="Open menu"
-            aria-expanded={menuOpen}
-          >
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <div className="hidden md:flex items-center gap-3">
+    <>
+      <header className="fixed inset-x-0 top-0 z-30 border-b border-black/[0.06] bg-white/70 supports-[backdrop-filter]:bg-white/55 backdrop-blur-2xl supports-[backdrop-filter]:backdrop-saturate-150 ring-1 ring-black/[0.04] shadow-[0_14px_40px_-28px_rgba(15,23,42,0.45)] transition-colors duration-200">
+        <div className="mx-auto w-full max-w-[1520px] px-3 sm:px-5 lg:px-6 py-3 sm:py-3.5 grid grid-cols-2 md:grid-cols-[auto,1fr,auto] items-center gap-3">
+          <div className="flex items-center gap-3 justify-self-start">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 grid place-items-center shadow-soft ring-1 ring-black/5 dark:ring-white/10">
               <img src={finvisionMark} alt="FinVision" className="h-5 w-5 invert brightness-0" />
             </div>
@@ -362,54 +412,55 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
               FinVision
             </h1>
           </div>
-        </div>
 
-        <div className="flex justify-center justify-self-center">
-          <div className="md:hidden flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 grid place-items-center shadow-soft ring-1 ring-black/5 dark:ring-white/10">
-              <img src={finvisionMark} alt="FinVision" className="h-5 w-5 invert brightness-0" />
-            </div>
-            <div className="font-display text-base font-extrabold tracking-tight text-slate-900 dark:text-white">FinVision</div>
+          <div className="hidden md:flex justify-center justify-self-center">
+            <CapsuleNav navItems={desktopNavItems} activeTab={activeTab} onNavigate={onNavigate} onPreload={onPreload} />
           </div>
-          <div className="hidden md:flex justify-center">
-            <CapsuleNav navItems={navItems} activeTab={activeTab} onNavigate={onNavigate} onPreload={onPreload} />
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0 justify-end justify-self-end">
-          <button
-            type="button"
-            onClick={() => onNavigate?.('settings')}
-            className="hidden lg:flex items-center gap-3 rounded-[8px] border border-black/5 dark:border-white/10 bg-white/60 dark:bg-slate-950/30 px-3 py-2 text-left hover:bg-white/80 dark:hover:bg-slate-900/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-            aria-label="Open settings"
-            title="Settings"
-          >
-            <div className="grid h-9 w-9 place-items-center rounded-[8px] bg-blue-600 text-sm font-extrabold text-white">
+          <div className="flex items-center gap-2 flex-shrink-0 justify-end justify-self-end">
+            <button
+              type="button"
+              onClick={() => onNavigate?.('settings')}
+              className="md:hidden h-9 w-9 rounded-full bg-blue-600 text-sm font-extrabold text-white grid place-items-center shadow-sm ring-1 ring-black/5"
+              aria-label="Open settings"
+            >
               {initials}
-            </div>
-            <div className="min-w-0 max-w-[12rem]">
-              <div className="truncate text-sm font-extrabold text-slate-900 dark:text-white">{currentUser?.name || 'User'}</div>
-              <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">{currentUser?.email || 'Local session'}</div>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => logout?.()}
-            className="hidden sm:inline-flex p-2 rounded-xl text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            aria-label="Logout"
-            title="Logout"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 17l5-5-5-5" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H3" />
-            </svg>
-          </button>
-        </div>
-      </div>
+            </button>
 
-      {mobileMenu}
-    </header>
+            <button
+              type="button"
+              onClick={() => onNavigate?.('settings')}
+              className="hidden lg:flex items-center gap-3 rounded-[8px] border border-black/5 dark:border-white/10 bg-white/60 dark:bg-slate-950/30 px-3 py-2 text-left hover:bg-white/80 dark:hover:bg-slate-900/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+              aria-label="Open settings"
+              title="Settings"
+            >
+              <div className="grid h-9 w-9 place-items-center rounded-[8px] bg-blue-600 text-sm font-extrabold text-white">
+                {initials}
+              </div>
+              <div className="min-w-0 max-w-[12rem]">
+                <div className="truncate text-sm font-extrabold text-slate-900 dark:text-white">{currentUser?.name || 'User'}</div>
+                <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">{currentUser?.email || 'Local session'}</div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => logout?.()}
+              className="hidden md:inline-flex p-2 rounded-xl text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              aria-label="Logout"
+              title="Logout"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 17l5-5-5-5" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H3" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {mobileBottomNav}
+    </>
   );
 };
 

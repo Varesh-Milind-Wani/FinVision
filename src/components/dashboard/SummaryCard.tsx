@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import './dashboardCards.css';
 
 type Props = {
   title: string;
@@ -398,15 +399,14 @@ const SummaryCard = ({
   };
 
   return (
-    <div className="kpi-card relative group hover:shadow-lg transition-all duration-300 ring-1 ring-black/[0.04] bg-white flex flex-col h-full">
+    <div className="kpi-card group hover:shadow-lg transition-all duration-300 ring-1 ring-black/[0.04]">
       <div className="flex items-center justify-between gap-3 relative z-10">
         <div className="flex items-center gap-2.5">
-          <div className={`h-9 w-9 rounded-xl grid place-items-center ring-1 transition-all duration-300 ${
-            iconTone === 'emerald' ? 'bg-emerald-50 text-emerald-600 ring-emerald-500/10 group-hover:bg-emerald-100' :
-            iconTone === 'orange' ? 'bg-orange-50 text-orange-600 ring-orange-500/10 group-hover:bg-orange-100' :
-            iconTone === 'violet' ? 'bg-violet-50 text-violet-600 ring-violet-500/10 group-hover:bg-violet-100' :
-            'bg-slate-50 text-slate-600 ring-slate-500/10 group-hover:bg-slate-100'
-          }`}>
+          <div className={`h-9 w-9 rounded-xl grid place-items-center ring-1 transition-all duration-300 ${iconTone === 'emerald' ? 'bg-emerald-50 text-emerald-600 ring-emerald-500/10 group-hover:bg-emerald-100' :
+              iconTone === 'orange' ? 'bg-orange-50 text-orange-600 ring-orange-500/10 group-hover:bg-orange-100' :
+                iconTone === 'violet' ? 'bg-violet-50 text-violet-600 ring-violet-500/10 group-hover:bg-violet-100' :
+                  'bg-slate-50 text-slate-600 ring-slate-500/10 group-hover:bg-slate-100'
+            }`}>
             {icon ? React.cloneElement(icon as React.ReactElement, { className: 'h-4 w-4' }) : null}
           </div>
           <div>
@@ -430,23 +430,22 @@ const SummaryCard = ({
         ) : null}
       </div>
 
-      <div className="mt-2">
-        <div className="text-[24px] sm:text-[26px] leading-[30px] sm:leading-[32px] font-semibold tracking-[-0.03em] text-slate-950 tabular-nums">
-          {value}
-        </div>
-        {isLoading ? (
-          <div className="mt-1 h-3 w-[72%] max-w-[220px] rounded-full bg-slate-100 ring-1 ring-black/5 animate-pulse" aria-hidden="true" />
-        ) : deltaLabel && !spark ? (
-          <div className="mt-auto pt-2 flex items-center gap-1.5 text-[12px]">
-            <span className={['font-bold text-[10px]', deltaTone === 'up' || (deltaTone === 'neutral' && parsedDelta?.pctText.startsWith('+')) ? 'text-emerald-600' : deltaTone === 'down' || (deltaTone === 'neutral' && parsedDelta?.pctText.startsWith('−')) ? 'text-rose-600' : 'text-slate-600'].join(' ')}>
-              {deltaTone === 'up' ? '▲' : deltaTone === 'down' ? '▼' : ''} {parsedDelta?.pctText}
-            </span>
-            <span className="text-[10px] font-semibold text-slate-400 tracking-tight">
-              {parsedDelta?.caption}
-            </span>
-          </div>
-        ) : null}
+      <div className="kpi-value">
+        {value}
       </div>
+
+      {isLoading ? (
+        <div className="mt-1 h-3 w-[72%] max-w-[220px] rounded-full bg-slate-100 ring-1 ring-black/5 animate-pulse" aria-hidden="true" />
+      ) : deltaLabel && !spark ? (
+        <div className="mt-auto pt-2 flex items-center gap-1.5 text-[12px]">
+          <span className={['font-bold text-[10px]', deltaTone === 'up' || (deltaTone === 'neutral' && parsedDelta?.pctText.startsWith('+')) ? 'text-emerald-600' : deltaTone === 'down' || (deltaTone === 'neutral' && parsedDelta?.pctText.startsWith('−')) ? 'text-rose-600' : 'text-slate-600'].join(' ')}>
+            {deltaTone === 'up' ? '▲' : deltaTone === 'down' ? '▼' : ''} {parsedDelta?.pctText}
+          </span>
+          <span className="text-[10px] font-semibold text-slate-400 tracking-tight">
+            {parsedDelta?.caption}
+          </span>
+        </div>
+      ) : null}
 
       {sparklineVariant === 'inline' && spark ? (
         <div className="mt-3 flex justify-end">
@@ -489,150 +488,155 @@ const SummaryCard = ({
 
       {chartOpen && modal
         ? createPortal(
-            <div className="fixed inset-0 z-[10000]">
-              <div aria-hidden="true" className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setChartOpen(false)} />
-              <div className="relative h-full w-full flex items-start sm:items-center justify-center p-4 sm:p-6">
-                <div
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label={modal.title}
-                  className="w-[min(1100px,96vw)] h-[min(760px,92dvh)] overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/10 flex flex-col"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="px-5 py-4 border-b border-black/[0.06] flex items-start justify-between gap-4">
-                    <div>
-                      <div className="font-display text-lg font-extrabold text-slate-900">{modal.title}</div>
-                      {modal.subtitle ? <div className="mt-1 text-[12px] text-slate-500">{modal.subtitle}</div> : null}
+          <div className="fixed inset-0 z-[10000]">
+            <div aria-hidden="true" className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setChartOpen(false)} />
+            <div className="relative h-full w-full flex items-start sm:items-center justify-center p-4 sm:p-6">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={modal.title}
+                className="w-[min(1100px,96vw)] shrink-0 mt-auto sm:my-auto flex flex-col max-h-[90dvh] sm:max-h-[min(760px,92dvh)] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white/95 backdrop-blur-2xl shadow-2xl ring-1 ring-black/10 pointer-events-auto transition-transform mx-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Mobile Handle */}
+                <div className="w-full flex justify-center pt-3 pb-1 sm:hidden shrink-0" aria-hidden="true">
+                  <div className="w-12 h-1.5 rounded-full bg-slate-200" />
+                </div>
+
+                <div className="flex items-start justify-between gap-4 px-5 sm:px-6 py-3 sm:py-4 border-b border-black/5 shrink-0">
+                  <div className="min-w-0">
+                    <div className="font-display text-xl sm:text-xl font-extrabold text-slate-900 truncate">{modal.title}</div>
+                    {modal.subtitle ? <div className="mt-0.5 text-xs text-slate-500">{modal.subtitle}</div> : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setChartOpen(false)}
+                    className="shrink-0 h-9 w-9 rounded-2xl ring-1 ring-black/5 bg-slate-50/80 hover:bg-slate-100 transition-colors grid place-items-center"
+                    aria-label="Close"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-700" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="px-3 sm:px-5 py-4 flex-1 min-h-0 flex flex-col">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="text-[12px] font-semibold text-slate-700">Range</div>
+                    <div className="relative" ref={rangeMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() => setRangeMenuOpen((v) => !v)}
+                        className="h-9 px-3 rounded-full bg-white/80 text-slate-800 ring-1 ring-black/5 hover:bg-white transition-colors text-[12px] font-semibold inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        aria-haspopup="menu"
+                        aria-expanded={rangeMenuOpen}
+                      >
+                        {rangeLabel}
+                        <svg viewBox="0 0 24 24" className="h-4 w-4 text-slate-500" aria-hidden="true">
+                          <path fill="currentColor" d="M7 10l5 5 5-5 1.4 1.4-6.4 6.4-6.4-6.4L7 10z" />
+                        </svg>
+                      </button>
+
+                      {rangeMenuOpen ? (
+                        <div
+                          role="menu"
+                          className="absolute right-0 mt-2 w-36 overflow-hidden rounded-2xl bg-white ring-1 ring-black/10 shadow-[0_20px_44px_-30px_rgba(15,23,42,0.65)] z-50"
+                        >
+                          {rangeOptions.map((o) => (
+                            <button
+                              key={o.days}
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setRangeDays(o.days);
+                                setRangeMenuOpen(false);
+                              }}
+                              className={[
+                                'w-full px-3 py-2 text-left text-[12px] font-semibold transition-colors',
+                                o.days === rangeDays ? 'bg-slate-950 text-white' : 'text-slate-700 hover:bg-slate-50',
+                              ].join(' ')}
+                            >
+                              {o.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setChartOpen(false)}
-                      className="h-9 w-9 rounded-xl grid place-items-center text-slate-500 hover:bg-slate-100 transition-colors"
-                      aria-label="Close"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-                      </svg>
-                    </button>
                   </div>
 
-                  <div className="px-3 sm:px-5 py-4 flex-1 min-h-0 flex flex-col">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <div className="text-[12px] font-semibold text-slate-700">Range</div>
-                      <div className="relative" ref={rangeMenuRef}>
-                        <button
-                          type="button"
-                          onClick={() => setRangeMenuOpen((v) => !v)}
-                          className="h-9 px-3 rounded-full bg-white/80 text-slate-800 ring-1 ring-black/5 hover:bg-white transition-colors text-[12px] font-semibold inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                          aria-haspopup="menu"
-                          aria-expanded={rangeMenuOpen}
-                        >
-                          {rangeLabel}
-                          <svg viewBox="0 0 24 24" className="h-4 w-4 text-slate-500" aria-hidden="true">
-                            <path fill="currentColor" d="M7 10l5 5 5-5 1.4 1.4-6.4 6.4-6.4-6.4L7 10z" />
-                          </svg>
-                        </button>
-
-                        {rangeMenuOpen ? (
-                          <div
-                            role="menu"
-                            className="absolute right-0 mt-2 w-36 overflow-hidden rounded-2xl bg-white ring-1 ring-black/10 shadow-[0_20px_44px_-30px_rgba(15,23,42,0.65)] z-50"
-                          >
-                            {rangeOptions.map((o) => (
-                              <button
-                                key={o.days}
-                                type="button"
-                                role="menuitem"
-                                onClick={() => {
-                                  setRangeDays(o.days);
-                                  setRangeMenuOpen(false);
-                                }}
-                                className={[
-                                  'w-full px-3 py-2 text-left text-[12px] font-semibold transition-colors',
-                                  o.days === rangeDays ? 'bg-slate-950 text-white' : 'text-slate-700 hover:bg-slate-50',
-                                ].join(' ')}
-                              >
-                                {o.label}
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="flex-1 min-h-0">
-                      <div
-                        ref={chartViewportRef}
-                        onPointerDown={handlePointerDown}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        onPointerCancel={handlePointerUp}
-                        onPointerLeave={handlePointerUp}
-                        className="relative h-full w-full select-none touch-none cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden outline-none border-0 ring-0"
-                        aria-label="Chart"
-                      >
-                        {!hasNonZeroData ? (
-                          <div className="absolute inset-0 grid place-items-center">
-                            <div className="text-[14px] font-extrabold text-slate-400">No Data</div>
-                          </div>
-                        ) : null}
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={chartData} margin={{ top: 10, right: 18, bottom: 8, left: 12 }}>
-                            <defs>
-                              <linearGradient id="summaryFill" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#16a34a" stopOpacity={0.20} />
-                                <stop offset="100%" stopColor="#16a34a" stopOpacity={0.02} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.06)" />
-                            <XAxis
-                              dataKey="ts"
-                              type="number"
-                              domain={['dataMin', 'dataMax']}
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 11, fill: '#64748b' }}
-                              dy={8}
-                              tickFormatter={xTickFormatter as any}
-                              tickMargin={8}
-                              interval="preserveStartEnd"
-                            />
-                            <YAxis
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 11, fill: '#64748b' }}
-                              tickFormatter={(v) => formatValue(Number(v) || 0)}
-                              width={92}
-                              domain={yDomain as any}
-                            />
-                            {hasNonZeroData ? <ReferenceLine y={0} stroke="rgba(15,23,42,0.10)" strokeDasharray="3 3" /> : null}
-                            {hasNonZeroData ? (
-                              <>
-                                <Tooltip
-                                  content={<ModalTooltip />}
-                                  cursor={{ stroke: 'rgba(22,163,74,0.22)', strokeWidth: 1, strokeDasharray: '3 3' }}
-                                />
-                                <Area
-                                  type="monotone"
-                                  dataKey="value"
-                                  stroke="#16a34a"
-                                  strokeWidth={2.6}
-                                  fill="url(#summaryFill)"
-                                  dot={false}
-                                  activeDot={{ r: 4.5, fill: '#16a34a', stroke: '#fff', strokeWidth: 2 }}
-                                />
-                              </>
-                            ) : null}
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
+                  <div className="flex-1 min-h-0">
+                    <div
+                      ref={chartViewportRef}
+                      onPointerDown={handlePointerDown}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={handlePointerUp}
+                      onPointerCancel={handlePointerUp}
+                      onPointerLeave={handlePointerUp}
+                      className="relative h-full w-full select-none touch-none cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden outline-none border-0 ring-0"
+                      aria-label="Chart"
+                    >
+                      {!hasNonZeroData ? (
+                        <div className="absolute inset-0 grid place-items-center">
+                          <div className="text-[14px] font-extrabold text-slate-400">No Data</div>
+                        </div>
+                      ) : null}
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData} margin={{ top: 10, right: 18, bottom: 8, left: 12 }}>
+                          <defs>
+                            <linearGradient id="summaryFill" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#16a34a" stopOpacity={0.20} />
+                              <stop offset="100%" stopColor="#16a34a" stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.06)" />
+                          <XAxis
+                            dataKey="ts"
+                            type="number"
+                            domain={['dataMin', 'dataMax']}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 11, fill: '#64748b' }}
+                            dy={8}
+                            tickFormatter={xTickFormatter as any}
+                            tickMargin={8}
+                            interval="preserveStartEnd"
+                          />
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 11, fill: '#64748b' }}
+                            tickFormatter={(v) => formatValue(Number(v) || 0)}
+                            width={92}
+                            domain={yDomain as any}
+                          />
+                          {hasNonZeroData ? <ReferenceLine y={0} stroke="rgba(15,23,42,0.10)" strokeDasharray="3 3" /> : null}
+                          {hasNonZeroData ? (
+                            <>
+                              <Tooltip
+                                content={<ModalTooltip />}
+                                cursor={{ stroke: 'rgba(22,163,74,0.22)', strokeWidth: 1, strokeDasharray: '3 3' }}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="value"
+                                stroke="#16a34a"
+                                strokeWidth={2.6}
+                                fill="url(#summaryFill)"
+                                dot={false}
+                                activeDot={{ r: 4.5, fill: '#16a34a', stroke: '#fff', strokeWidth: 2 }}
+                              />
+                            </>
+                          ) : null}
+                        </AreaChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>,
-            document.body
-          )
+            </div>
+          </div>,
+          document.body
+        )
         : null}
     </div>
   );

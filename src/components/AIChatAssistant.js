@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useExpenseContext } from '../contexts/ExpenseContext';
 import { useCurrency } from '../contexts/CurrencyContext';
@@ -12,6 +12,7 @@ import {
 import { buildAssistantAnswer } from '../utils/assistantAnswers';
 
 const STORAGE_KEY = 'finvision.aiChat.v1';
+const CHAT_BTN_POS_KEY = 'finvision.chatBtnPos.v1';
 
 const safeParse = (raw) => {
   try {
@@ -465,6 +466,114 @@ const TxDraftCard = ({ initialEntries, categories, onConfirm, onCancel }) => {
   );
 };
 
+function useDraggableButton(storageKey, defaultStyleFn) {
+  const buttonRef = useRef(null);
+  const dragRef = useRef({ dragging: false, startX: 0, startY: 0, baseLeft: 0, baseTop: 0, moved: false, pointerId: null });
+  const [pos, setPos] = useState(null);
+  const [dragging, setDragging] = useState(false);
+
+  const readSafeAreaInsets = useCallback(() => {
+    try {
+      const style = window.getComputedStyle(document.documentElement);
+      const readPx = (name) => { const raw = style.getPropertyValue(name); const n = parseFloat(String(raw || '').trim()); return Number.isFinite(n) ? n : 0; };
+      return { top: readPx('--safe-area-inset-top'), right: readPx('--safe-area-inset-right'), bottom: readPx('--safe-area-inset-bottom'), left: readPx('--safe-area-inset-left') };
+    } catch { return { top: 0, right: 0, bottom: 0, left: 0 }; }
+  }, []);
+
+  const clampPos = useCallback((next, rect, viewport) => {
+    const pad = 16;
+    const safe = readSafeAreaInsets();
+    const w = Math.max(48, Math.round(rect?.width || 56));
+    const h = Math.max(48, Math.round(rect?.height || 56));
+    const vw = Math.max(320, Math.round(viewport?.w || window.innerWidth || 1024));
+    const vh = Math.max(320, Math.round(viewport?.h || window.innerHeight || 768));
+    const minLeft = Math.max(0, pad + (safe.left || 0));
+    const minTop = Math.max(0, pad + (safe.top || 0));
+    const maxLeft = Math.max(minLeft, vw - pad - (safe.right || 0) - w);
+    const maxTop = Math.max(minTop, vh - pad - (safe.bottom || 0) - h);
+    return { left: Math.max(minLeft, Math.min(Math.round(next.left), maxLeft)), top: Math.max(minTop, Math.min(Math.round(next.top), maxTop)) };
+  }, [readSafeAreaInsets]);
+
+  const readStoredPos = useCallback(() => {
+    try {
+      const raw = window?.localStorage?.getItem?.(storageKey);
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      if (!p || !Number.isFinite(Number(p.left)) || !Number.isFinite(Number(p.top))) return null;
+      return { left: Number(p.left), top: Number(p.top) };
+    } catch { return null; }
+  }, [storageKey]);
+
+  const writeStoredPos = useCallback((p) => {
+    try { window?.localStorage?.setItem?.(storageKey, JSON.stringify({ left: Math.round(p.left), top: Math.round(p.top) })); } catch { }
+  }, [storageKey]);
+
+  useEffect(() => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const stored = readStoredPos();
+    const vw = window.innerWidth || 1024;
+    const vh = window.innerHeight || 768;
+    const safe = readSafeAreaInsets();
+    const defaultPos = defaultStyleFn ? defaultStyleFn(vw, vh, safe, rect) : { left: vw - 32 - (safe.right || 0) - rect.width, top: vh - 32 - (safe.bottom || 0) - rect.height };
+    const initial = stored || defaultPos;
+    const clamped = clampPos(initial, rect, { w: vw, h: vh });
+    setPos(clamped);
+    const onResize = () => {
+      const r = buttonRef.current?.getBoundingClientRect?.();
+      if (!r) return;
+      const cur = readStoredPos() || clamped;
+      const next = clampPos(cur, r, { w: window.innerWidth || 1024, h: window.innerHeight || 768 });
+      setPos(next);
+      writeStoredPos(next);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [clampPos, defaultStyleFn, readSafeAreaInsets, readStoredPos, writeStoredPos]);
+
+  const onPointerDown = useCallback((e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    const el = buttonRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cur = pos || { left: rect.left, top: rect.top };
+    dragRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, baseLeft: cur.left, baseTop: cur.top, moved: false, pointerId: e.pointerId };
+    setDragging(true);
+    try { el.setPointerCapture?.(e.pointerId); } catch { }
+  }, [pos]);
+
+  const onPointerMove = useCallback((e) => {
+    if (!dragRef.current.dragging) return;
+    if (dragRef.current.pointerId !== null && e.pointerId !== dragRef.current.pointerId) return;
+    const el = buttonRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (!dragRef.current.moved && Math.hypot(dx, dy) >= 6) dragRef.current.moved = true;
+    const next = clampPos({ left: dragRef.current.baseLeft + dx, top: dragRef.current.baseTop + dy }, rect, { w: window.innerWidth || 1024, h: window.innerHeight || 768 });
+    setPos(next);
+  }, [clampPos]);
+
+  const endDrag = useCallback((e) => {
+    if (!dragRef.current.dragging) return;
+    if (dragRef.current.pointerId !== null && e?.pointerId !== dragRef.current.pointerId) return;
+    const el = buttonRef.current;
+    try { if (el && dragRef.current.pointerId !== null) el.releasePointerCapture?.(dragRef.current.pointerId); } catch { }
+    const moved = !!dragRef.current.moved;
+    dragRef.current.dragging = false;
+    dragRef.current.pointerId = null;
+    setDragging(false);
+    if (pos) writeStoredPos(pos);
+    if (moved) setTimeout(() => { dragRef.current.moved = false; }, 0);
+  }, [pos, writeStoredPos]);
+
+  const wasMoved = () => dragRef.current.moved;
+
+  return { buttonRef, pos, dragging, onPointerDown, onPointerMove, endDrag, wasMoved };
+}
+
 export default function AIChatAssistant() {
   const { transactions, categories, addTransaction, totalExpenses, totalIncome, netBalance } = useExpenseContext();
   const { formatFromBase } = useCurrency();
@@ -676,21 +785,41 @@ export default function AIChatAssistant() {
     </div>
   ) : null;
 
+  const defaultChatBtnPos = useCallback((vw, vh, safe, rect) => ({
+    left: vw - 32 - (safe.right || 0) - rect.width - (rect.width + 32),
+    top: vh - 32 - (safe.bottom || 0) - rect.height,
+  }), []);
+
+  const { buttonRef: chatBtnRef, pos: chatPos, dragging: chatDragging, onPointerDown: chatPointerDown, onPointerMove: chatPointerMove, endDrag: chatEndDrag, wasMoved: chatWasMoved } =
+    useDraggableButton(CHAT_BTN_POS_KEY, defaultChatBtnPos);
+
   return (
     <>
       <button
+        ref={chatBtnRef}
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={(e) => {
+          if (chatWasMoved()) { e.preventDefault(); e.stopPropagation(); return; }
+          setOpen((v) => !v);
+        }}
+        onPointerDown={chatPointerDown}
+        onPointerMove={chatPointerMove}
+        onPointerUp={chatEndDrag}
+        onPointerCancel={chatEndDrag}
         className={[
           'fixed z-[10000] h-14 w-14 rounded-full',
-          'bg-slate-950 text-white shadow-lg ring-1 ring-white/10',
-          'hover:bg-slate-900 transition-colors',
+          'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-lg ring-1 ring-black/10',
+          'hover:from-indigo-700 hover:to-blue-700',
           'focus:outline-none focus:ring-2 focus:ring-blue-500/50',
+          'touch-none select-none',
+          chatDragging ? 'cursor-grabbing' : 'cursor-pointer',
+          chatDragging ? '' : 'transition-transform duration-200 ease-out hover:scale-[1.08] active:scale-[0.96]',
         ].join(' ')}
-        style={{
-          right: 'calc(6rem + var(--safe-area-inset-right))',
-          bottom: 'calc(1.5rem + var(--safe-area-inset-bottom))',
-        }}
+        style={
+          chatPos
+            ? { left: `${chatPos.left}px`, top: `${chatPos.top}px` }
+            : { right: 'calc(6rem + var(--safe-area-inset-right))', bottom: 'calc(1.5rem + var(--safe-area-inset-bottom))' }
+        }
         aria-label="Open FinVision Assistant"
         title="FinVision Assistant"
       >
