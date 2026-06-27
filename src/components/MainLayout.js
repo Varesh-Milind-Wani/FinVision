@@ -537,7 +537,8 @@ const MainLayout = () => {
       </div>
       <Header activeTab={activeTab} onNavigate={handleNavigate} onPreload={preloadTab} />
       
-      <main className="mx-auto w-full max-w-[1520px] px-2 sm:px-5 lg:px-6 pt-16 pb-28 md:pb-6">
+      
+      <main className="mx-auto w-full max-w-[1520px] px-2 sm:px-5 lg:px-6 pt-16 pb-22 md:pb-6">
         <div className="rounded-[10px] bg-transparent p-1 sm:p-2">
         {activeTab === 'dashboard' ? (
           <section>
