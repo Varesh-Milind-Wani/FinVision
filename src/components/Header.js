@@ -164,7 +164,7 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
       { id: 'transactions', label: 'New', desktopLabel: 'Transactions' },
       { id: 'budgets', label: 'Budgets', desktopLabel: 'Budgets' },
       { id: 'charts', label: 'Analytics', desktopLabel: 'Analytics' },
-      { id: 'settings', label: 'Settings', desktopLabel: 'Settings' },
+      { id: 'goals', label: 'Goals', desktopLabel: 'Goals' },
     ],
     []
   );
@@ -226,7 +226,7 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
         </svg>
       ),
     },
-    settings: {
+    goals: {
       outline: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="3" />

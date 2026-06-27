@@ -295,6 +295,95 @@ export const ExpenseProvider = ({ children }) => {
   const { transactions, categories, darkMode, currencyCode, networthSnapshots, dashboardPrefs } = state;
 
   // Save data to localStorage whenever state changes (debounced to avoid UI jank on large datasets).
+  useEffect(() => {
+    if (!hasLocalStorage) return;
+
+    const currentUserId = currentUser?.id;
+    const isGuestKey = String(currentUserId || 'guest') === 'guest';
+
+    // Only migrate when we are NOT on guest anymore.
+    if (isGuestKey) return;
+
+    const userKey = storageKey;
+    const guestKey = getExpenseStorageKeyForUser('guest');
+
+    try {
+      const legacyKey = 'expenseTrackerData'; // legacy (pre-user-scoped)
+
+      const rawUser = readExpenseStateFromStorage(userKey);
+      const hasUserData = !!rawUser && Array.isArray(rawUser.transactions) && rawUser.transactions.length > 0;
+
+      // If user already has data, don't overwrite; but still allow merging if guest/legacy has more.
+      const rawGuest = readExpenseStateFromStorage(guestKey);
+      const rawLegacy = readExpenseStateFromStorage(legacyKey);
+
+      const incomingTx = [rawGuest, rawLegacy]
+        .filter(Boolean)
+        .flatMap((r) => (Array.isArray(r.transactions) ? r.transactions : []));
+
+      const incomingCats = [rawGuest, rawLegacy]
+        .filter(Boolean)
+        .flatMap((r) => (Array.isArray(r.categories) ? r.categories : []));
+
+      if (!incomingTx.length && !incomingCats.length) return;
+
+      if (!hasUserData) {
+        // If user is empty, just load and normalize.
+        dispatch({
+          type: LOAD_DATA,
+          payload: normalizeExpenseState(initialState, rawUser || rawGuest || rawLegacy),
+        });
+        return;
+      }
+
+      // Merge with de-dup by transaction.id
+      const userTx = Array.isArray(rawUser?.transactions) ? rawUser.transactions : [];
+      const mergedTxById = new Map();
+      [...userTx, ...incomingTx].forEach((t) => {
+        const id = typeof t?.id === 'string' && t.id.trim() ? t.id.trim() : null;
+        if (!id) return;
+        mergedTxById.set(id, t);
+      });
+
+      // Merge categories by id (prefer existing user categories colors/names if present)
+      const userCats = Array.isArray(rawUser?.categories) ? rawUser.categories : initialState.categories;
+      const catById = new Map();
+      userCats.forEach((c) => {
+        if (c?.id) catById.set(c.id, c);
+      });
+      incomingCats.forEach((c) => {
+        if (!c?.id || catById.has(c.id)) return;
+        catById.set(c.id, c);
+      });
+
+      const mergedPayload = {
+        ...rawUser,
+        transactions: Array.from(mergedTxById.values()),
+        categories: Array.from(catById.values()),
+      };
+
+      dispatch({
+        type: LOAD_DATA,
+        payload: normalizeExpenseState(initialState, mergedPayload),
+      });
+
+      // Optional: clear guest/legacy after successful merge to prevent future duplicates.
+      // Keep this conservative: only clear if user now has merged transactions.
+      if (mergedTxById.size > 0) {
+        try {
+          window.localStorage.removeItem(guestKey);
+          window.localStorage.removeItem(legacyKey);
+        } catch {
+          // ignore
+        }
+      }
+    } catch (e) {
+      if (IS_DEV) console.error('Expense data migration failed:', e);
+    }
+  }, [currentUser?.id, hasLocalStorage, storageKey]);
+
+  // Save data to localStorage whenever state changes (debounced to avoid UI jank on large datasets).
+  // Save data to localStorage whenever state changes (debounced to avoid UI jank on large datasets).
   const saveTimerRef = useRef(null);
   useEffect(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
