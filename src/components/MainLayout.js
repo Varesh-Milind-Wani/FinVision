@@ -14,6 +14,7 @@ const loadSettings = () => import('./Settings');
 const loadGoals = () => import('./Goals');
 const loadInsights = () => import('./AIInsights');
 const loadAIChatAssistant = () => import('./AIChatAssistant');
+const loadBudgets = () => import('./Budgets');
 
 const Dashboard = React.lazy(loadDashboard);
 const TransactionList = React.lazy(loadTransactionList);
@@ -24,11 +25,12 @@ const Settings = React.lazy(loadSettings);
 const Goals = React.lazy(loadGoals);
 const AIInsights = React.lazy(loadInsights);
 const AIChatAssistant = React.lazy(loadAIChatAssistant);
+const Budgets = React.lazy(loadBudgets);
 const TransactionMap = React.lazy(() => import('./TransactionMap'));
 
 const TAB_STORAGE_KEY = 'finvision.activeTab';
 const LAYOUT_UI_STORAGE_KEY = 'finvision.layoutUi.v1';
-const ALLOWED_TABS = new Set(['dashboard', 'transactions', 'categories', 'charts', 'networth', 'goals', 'insights', 'settings']);
+const ALLOWED_TABS = new Set(['dashboard', 'transactions', 'categories', 'charts', 'networth', 'goals', 'insights', 'settings', 'budgets']);
 const FAB_POS_STORAGE_KEY = 'finvision.fabPos.v1';
 
 const TabFallback = ({ label }) => (
@@ -265,80 +267,32 @@ const FloatingActionButton = ({ onClick }) => {
 };
 
 const SectionTitle = ({ title, actionButton, subtitle }) => (
-  <div className="mb-6 animate-float-in">
-    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+  <div className="mb-3 animate-float-in">
+    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
       <div>
         <h2 className="font-display text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
           {title}
         </h2>
         {subtitle ? (
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{subtitle}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">{subtitle}</p>
         ) : null}
       </div>
       {actionButton ? <div>{actionButton}</div> : null}
     </div>
-    <div className="mt-4 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent dark:via-slate-700" />
+    <div className="mt-2 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent dark:via-slate-700" />
   </div>
 );
 
 const TransactionsPanel = React.memo(function TransactionsPanel({ onOpenTransactionModal, onOpenMapModal }) {
   return (
-    <>
-      <SectionTitle
-        title="Transaction Manager"
-        subtitle="Add, edit, and filter transactions. Your data stays in sync with Charts and Net Worth."
-        actionButton={
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={onOpenMapModal}
-              className="btn-surface text-sm active:scale-[0.98]"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z" clipRule="evenodd" />
-              </svg>
-              View Location Heat Map
-            </button>
-            <button
-              onClick={onOpenTransactionModal}
-              className="btn-primary-gradient text-sm active:scale-[0.98]"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              New Transaction
-            </button>
-          </div>
-        }
-      />
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-12">
-        <div className="xl:col-span-2 flex flex-col">
-          <div className="surface overflow-hidden flex-1 flex flex-col">
-            <Suspense fallback={<TabFallback label="Loading transactions…" />}>
-              <TransactionList />
-            </Suspense>
-          </div>
-        </div>
-
-        <div className="xl:sticky xl:top-4 space-y-6 flex flex-col">
-          <div className="surface surface-pad flex-shrink-0">
-            <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-              </svg>
-              Quick Add
-            </h3>
-            <TransactionForm compact={true} />
-          </div>
-
-          <div id="export-import-container" className="bg-transparent overflow-hidden flex-shrink-0">
-            <Suspense fallback={<TabFallback label="Loading tools…" />}>
-              <ExportImport />
-            </Suspense>
-          </div>
-        </div>
-      </div>
-    </>
+    <div className="flex flex-col mb-12 w-full animate-float-in">
+      <Suspense fallback={<TabFallback label="Loading transactions…" />}>
+        <TransactionList 
+          onOpenTransactionModal={onOpenTransactionModal} 
+          onOpenMapModal={onOpenMapModal} 
+        />
+      </Suspense>
+    </div>
   );
 });
 
@@ -386,6 +340,7 @@ const MainLayout = () => {
     const byId = {
       dashboard: loadDashboard,
       transactions: loadTransactionList,
+      budgets: loadBudgets,
       charts: loadExpenseChart,
       networth: loadNetworth,
       goals: loadGoals,
@@ -497,7 +452,7 @@ const MainLayout = () => {
   useEffect(() => {
     // Background prefetch once the UI settles; helps make future tab switches feel instant.
     const t = window.setTimeout(() => {
-      for (const tab of ['transactions', 'charts', 'networth', 'goals', 'insights', 'settings']) {
+      for (const tab of ['transactions', 'budgets', 'charts', 'networth', 'goals', 'insights', 'settings']) {
         if (tab === activeTab) continue;
         preloadTab(tab);
       }
@@ -582,8 +537,8 @@ const MainLayout = () => {
       </div>
       <Header activeTab={activeTab} onNavigate={handleNavigate} onPreload={preloadTab} />
       
-      <main className="mx-auto w-full max-w-[1520px] px-2 sm:px-5 lg:px-6 pt-24 pb-8">
-        <div className="rounded-[10px] bg-transparent p-2 sm:p-3">
+      <main className="mx-auto w-full max-w-[1520px] px-2 sm:px-5 lg:px-6 pt-16 pb-28 md:pb-6">
+        <div className="rounded-[10px] bg-transparent p-1 sm:p-2">
         {activeTab === 'dashboard' ? (
           <section>
             <div className="hidden" aria-hidden="true">
@@ -606,7 +561,7 @@ const MainLayout = () => {
         
         {/* Transaction Management Section */}
         {activeTab === 'transactions' ? (
-          <section>
+          <section className="pt-4">
             <TransactionsPanel onOpenTransactionModal={openTransactionModal} onOpenMapModal={openMapModal} />
             {/*
               <>
@@ -686,19 +641,28 @@ const MainLayout = () => {
         
         {/* Settings Section */}
         {activeTab === 'settings' ? (
-          <section>
+          <section className="pt-4">
             <SectionTitle title="Settings" subtitle="Enterprise-grade preferences, privacy, and data management." />
 
             <SettingsPanel />
           </section>
         ) : null}
 
+        {/* Budgets Section */}
+        {activeTab === 'budgets' ? (
+          <section className="pt-4">
+            <Suspense fallback={<TabFallback label="Loading budgets…" />}>
+              <Budgets />
+            </Suspense>
+          </section>
+        ) : null}
+
         {/* Charts Section */}
         {activeTab === 'charts' ? (
-          <section>
+          <section className="pt-4">
             <SectionTitle title="Analytics" subtitle="Interactive charts and drilldowns powered by your transactions." />
             
-            <div className="surface overflow-hidden mb-12">
+            <div className="surface overflow-hidden mb-4">
               <Suspense fallback={<TabFallback label="Loading charts…" />}>
                 <ExpenseChart />
               </Suspense>
@@ -708,9 +672,9 @@ const MainLayout = () => {
 
         {/* Net Worth Section */}
         {activeTab === 'networth' ? (
-          <section>
+          <section className="pt-4">
             <SectionTitle title="Net Worth" subtitle="Track monthly snapshots and see your net worth trend synced with cashflow." />
-            <div className="surface overflow-hidden mb-12">
+            <div className="surface overflow-hidden mb-4">
               <Suspense fallback={<TabFallback label="Loading net worth…" />}>
                 <Networth />
               </Suspense>
@@ -720,9 +684,9 @@ const MainLayout = () => {
 
         {/* Goals Section */}
         {activeTab === 'goals' ? (
-          <section>
+          <section className="pt-4">
             <SectionTitle title="Goals" subtitle="Set targets, track progress, and get AI-powered recommendations." />
-            <div className="surface overflow-hidden mb-12">
+            <div className="surface overflow-hidden mb-4">
               <Suspense fallback={<TabFallback label="Loading goals…" />}>
                 <Goals />
               </Suspense>
@@ -732,9 +696,9 @@ const MainLayout = () => {
 
         {/* AI Insights Section */}
         {activeTab === 'insights' ? (
-          <section>
+          <section className="pt-4">
             <SectionTitle title="AI Insights" subtitle="Actionable patterns, smart alerts, and recommendations." />
-            <div className="surface overflow-hidden mb-12">
+            <div className="surface overflow-hidden mb-4">
               <Suspense fallback={<TabFallback label="Loading AI insights…" />}>
                 <AIInsights />
               </Suspense>
@@ -744,11 +708,11 @@ const MainLayout = () => {
         </div>
       </main>
       
-      {(activeTab === 'dashboard' || activeTab === 'transactions') && !isTransactionModalOpen && !isCategoryModalOpen && (
+      {!isTransactionModalOpen && !isCategoryModalOpen && (
         <FloatingActionButton onClick={openTransactionModal} />
       )}
 
-      {!isTransactionModalOpen && !isCategoryModalOpen ? (
+      {!isTransactionModalOpen && !isCategoryModalOpen && activeTab === 'dashboard' ? (
         <Suspense fallback={null}>
           <AIChatAssistant />
         </Suspense>
@@ -764,7 +728,7 @@ const MainLayout = () => {
                 role="dialog"
                 aria-modal="true"
                 aria-label="Add transaction"
-                className="w-full sm:w-[min(560px,92vw)] shrink-0 mt-auto sm:my-auto flex flex-col max-h-[92dvh] sm:max-h-[calc(100dvh-2rem)] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl shadow-2xl ring-1 ring-black/10 dark:ring-white/[0.12] pointer-events-auto transition-transform mx-auto"
+                className="w-full sm:w-[min(800px,96vw)] shrink-0 mt-auto sm:my-auto flex flex-col max-h-[90dvh] sm:max-h-[calc(85dvh-2rem)] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl shadow-2xl ring-1 ring-black/10 dark:ring-white/[0.12] pointer-events-auto transition-transform mx-auto"
               >
                 {/* Mobile Handle */}
                 <div className="w-full flex justify-center pt-3 pb-1 sm:hidden shrink-0" aria-hidden="true">

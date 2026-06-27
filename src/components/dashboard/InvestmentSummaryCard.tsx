@@ -72,37 +72,98 @@ function TrendUpIcon() {
   );
 }
 
-function InvestmentSparkline({ data, height = 48 }: { data: number[]; height?: number }) {
+function InvestmentSparkline({ data, height = 56 }: { data: number[]; height?: number }) {
   const pts = (data || []).filter((n) => Number.isFinite(n));
   if (pts.length < 2) return null;
+
   const min = Math.min(...pts);
   const max = Math.max(...pts);
   const range = max - min || 1;
-  const pad = range * 0.12;
+  const pad = range * 0.18;
   const yMin = min - pad;
   const yMax = max + pad;
   const safeR = yMax - yMin || 1;
-  const vbW = 300;
+
+  const vbW = 400;
   const vbH = height;
-  const stepX = (vbW - 6) / (pts.length - 1);
-  const toY = (v: number) => 4 + ((yMax - v) / safeR) * (vbH - 8);
-  const d = pts.map((v, i) => `${i === 0 ? 'M' : 'L'} ${3 + i * stepX} ${toY(v)}`).join(' ');
-  const areaD = `${d} L ${vbW - 3} ${vbH - 3} L 3 ${vbH - 3} Z`;
-  const last = pts[pts.length - 1];
-  const first = pts[0];
+  const padX = 16; // keep dots away from the edges so the halo is never clipped
+  const stepX = (vbW - padX * 2) / (pts.length - 1);
+  const toX = (i: number) => padX + i * stepX;
+  const toY = (v: number) => 2 + ((yMax - v) / safeR) * (vbH - 6);
+
+  // Catmull-Rom to cubic Bézier — glass-smooth curve
+  const toSmooth = (points: Array<{ x: number; y: number }>) => {
+    if (points.length < 2) return '';
+    if (points.length === 2)
+      return `M${points[0]!.x},${points[0]!.y} L${points[1]!.x},${points[1]!.y}`;
+    const d: string[] = [`M${points[0]!.x.toFixed(2)},${points[0]!.y.toFixed(2)}`];
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i - 1] || points[i];
+      const p1 = points[i]!;
+      const p2 = points[i + 1]!;
+      const p3 = points[i + 2] || p2;
+      const c1x = p1.x + (p2.x - p0.x) / 6;
+      const c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6;
+      const c2y = p2.y - (p3.y - p1.y) / 6;
+      d.push(`C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`);
+    }
+    return d.join(' ');
+  };
+
+  const coords = pts.map((v, i) => ({ x: toX(i), y: toY(v) }));
+  const linePath = toSmooth(coords);
+  const last = pts[pts.length - 1]!;
+  const first = pts[0]!;
   const up = last >= first;
   const s = up ? '#7C3AED' : '#F97316';
+  const sLight = up ? 'rgba(124,58,237,0.13)' : 'rgba(249,115,22,0.13)';
+  const sLighter = up ? 'rgba(124,58,237,0.01)' : 'rgba(249,115,22,0.01)';
+  const lastX = toX(pts.length - 1);
+  const lastY = toY(last);
+  const areaPath = `${linePath} L${lastX},${vbH} L0,${vbH} Z`;
+  const gradId = `ig2-${up ? 'v' : 'o'}`;
+  const strokeId = `isg-${up ? 'v' : 'o'}`;
+
   return (
-    <svg width="100%" height={vbH} viewBox={`0 0 ${vbW} ${vbH}`} preserveAspectRatio="xMidYMid meet" className="block">
+    <svg
+      width="100%"
+      height={vbH}
+      viewBox={`0 0 ${vbW} ${vbH}`}
+      preserveAspectRatio="none"
+      className="block"
+      style={{ display: 'block' }}
+    >
       <defs>
-        <linearGradient id={`ig-${s.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={s} stopOpacity={0.2} />
-          <stop offset="100%" stopColor={s} stopOpacity={0.02} />
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={s} stopOpacity={0.22} />
+          <stop offset="60%" stopColor={s} stopOpacity={0.07} />
+          <stop offset="100%" stopColor={s} stopOpacity={0} />
+        </linearGradient>
+        <linearGradient id={strokeId} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={s} stopOpacity={0.35} />
+          <stop offset="55%" stopColor={s} stopOpacity={1} />
+          <stop offset="100%" stopColor={s} stopOpacity={0.85} />
         </linearGradient>
       </defs>
-      <path d={areaD} fill={`url(#ig-${s.replace('#', '')})`} stroke="none" />
-      <path d={d} fill="none" stroke={s} strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={vbW - 3} cy={toY(last)} r={2} fill={s} />
+
+      {/* Area fill */}
+      <path d={areaPath} fill={`url(#${gradId})`} stroke="none" />
+
+      {/* Smooth curve */}
+      <path
+        d={linePath}
+        fill="none"
+        stroke={`url(#${strokeId})`}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* Live end dot with halo */}
+      <circle cx={lastX} cy={lastY} r={5} fill={s} opacity={0.15} />
+      <circle cx={lastX} cy={lastY} r={3} fill={s} />
+      <circle cx={lastX} cy={lastY} r={1.5} fill="white" />
     </svg>
   );
 }
@@ -1046,459 +1107,585 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
   };
 
   return (
-    <div className="kpi-card relative group hover:shadow-lg transition-all duration-300 ring-1 ring-black/[0.04] bg-white flex flex-col">
+    <div
+      className="relative group transition-all duration-300 overflow-hidden flex flex-col"
+      style={{
+        borderRadius: '20px',
+        background: '#ffffff',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.9) inset',
+        border: '1px solid rgba(0,0,0,0.06)',
+        padding: '16px 16px 12px 16px',
+        minHeight: '0',
+      }}
+    >
+
+
+
       {/* Header row */}
-      <div className="flex items-center justify-between gap-3 relative z-10">
-        <div className="flex items-center gap-2.5">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Icon */}
           <div
-            className={`h-9 w-9 rounded-xl grid place-items-center ring-1 transition-all duration-300 ${
-              phase === 'loading' ? 'bg-slate-100 text-slate-500 ring-black/5' : 'bg-orange-50 text-orange-600 ring-orange-500/10 group-hover:bg-orange-100'
-            }`}
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+              boxShadow: '0 4px 12px rgba(124,58,237,0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 6l-9.5 9.5-5-5L1 18" />
+              <path d="M17 6h6v6" />
+            </svg>
           </div>
           <div>
-            <div className="text-[12px] font-bold text-slate-600 tracking-tight uppercase">{title}</div>
-            <div className="mt-0.5 text-[10px] text-slate-400 font-semibold">Current value</div>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#6D28D9', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              {title}
+            </div>
+            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, marginTop: '1px' }}>Current value</div>
           </div>
         </div>
+
+        {/* More button */}
         <button
           type="button"
-          className="shrink-0 h-9 w-9 rounded-xl grid place-items-center bg-slate-50 text-slate-700 ring-1 ring-slate-200/80 shadow-sm hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          aria-label="Open investment chart"
           onClick={() => setChartOpen(true)}
+          aria-label="Open investment chart"
+          style={{
+            width: '30px',
+            height: '30px',
+            borderRadius: '8px',
+            background: 'rgba(124,58,237,0.07)',
+            border: '1px solid rgba(124,58,237,0.12)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: '#7C3AED',
+            flexShrink: 0,
+            transition: 'background 150ms ease',
+          }}
         >
           <MoreIcon />
         </button>
       </div>
-      <div className="mt-2">
-        <div className="text-[24px] sm:text-[26px] leading-[30px] sm:leading-[32px] font-semibold tracking-[-0.03em] text-slate-950 tabular-nums">{formatFromBase(invV)}</div>
-        <div className="mt-1 flex items-center gap-1.5 text-[12px]">
-          <span className="text-slate-500 tracking-tight">Invested {formatFromBase(Number(investAmount) || 0)}</span>
-          {hasInvestments ? (
-            <span className={['inline-flex items-center rounded-sm px-1 py-0.5 text-[10px] font-bold tabular-nums', (Number(total) - Number(investAmount)) >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'].join(' ')}>
-              {(Number(total) - Number(investAmount)) >= 0 ? '+' : ''}{((Number(total) - Number(investAmount)) / Math.max(1, Number(investAmount)) * 100).toFixed(1)}%
-            </span>
-          ) : null}
+
+      {/* Value section */}
+      <div style={{ marginTop: '14px', position: 'relative', zIndex: 1 }}>
+        <div
+          style={{
+            fontSize: '28px',
+            lineHeight: 1.1,
+            fontWeight: 700,
+            letterSpacing: '-0.04em',
+            color: '#0f172a',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {formatFromBase(invV)}
+        </div>
+
+        {/* Invested + P&L badge row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
+            Invested {formatFromBase(Number(investAmount) || 0)}
+          </span>
+          {hasInvestments && (() => {
+            const pnl = Number(total) - Number(investAmount);
+            const pct = (pnl / Math.max(1, Number(investAmount))) * 100;
+            const isUp = pnl >= 0;
+            return (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: isUp ? '#059669' : '#e11d48',
+                  background: isUp ? 'rgba(5,150,105,0.09)' : 'rgba(225,29,72,0.09)',
+                  borderRadius: '6px',
+                  padding: '1px 6px',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{pct.toFixed(1)}%
+              </span>
+            );
+          })()}
         </div>
       </div>
 
-{hasInvestments && series && series.length > 1 ? (
-         <div className="mt-auto pt-2">
-           <div className="w-full max-w-full overflow-hidden">
-             <InvestmentSparkline data={series as number[]} height={36} />
-           </div>
-           <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
-             <span className="text-slate-500">{activePositions.length} holding{activePositions.length === 1 ? '' : 's'}</span>
-             <span onClick={() => setChartOpen(true)} className="cursor-pointer text-orange-600 hover:text-orange-700 transition-colors">Trend & details →</span>
-           </div>
-         </div>
+      {/* Sparkline — full-bleed */}
+      {hasInvestments && series && series.length > 1 ? (
+        <div style={{ marginTop: 'auto', paddingTop: '12px' }}>
+          {/* Chart bleed — extends past card padding on all sides */}
+          <div
+            style={{
+              marginLeft: '-16px',
+              marginRight: '-16px',
+              lineHeight: 0,
+              fontSize: 0,
+            }}
+          >
+            <InvestmentSparkline data={series as number[]} height={68} />
+          </div>
+
+          {/* Footer */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingTop: '10px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                color: '#94a3b8',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {activePositions.length} holding{activePositions.length === 1 ? '' : 's'}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setChartOpen(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '10px',
+                fontWeight: 700,
+                color: '#7C3AED',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Trend & details
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
       ) : phase === 'loading' ? (
-        <div className="flex-1 grid place-items-center">
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '16px' }}>
           <span className="kpi-loader" aria-label="Loading" />
         </div>
       ) : null}
 
       {chartOpen
         ? createPortal(
-            <div className="fixed inset-0 z-[10000]">
-              <div aria-hidden="true" className="fixed inset-0 bg-slate-950/55 backdrop-blur-md" onClick={() => setChartOpen(false)} />
-              <div className="relative h-full w-full flex items-start sm:items-center justify-center p-4 sm:p-6">
-                <div
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Investment trend"
-                  className="relative w-[min(1100px,96vw)] h-[min(780px,92dvh)] overflow-hidden rounded-3xl bg-white/75 dark:bg-slate-950/70 backdrop-blur-xl shadow-[0_30px_80px_-40px_rgba(15,23,42,0.65)] ring-1 ring-black/10 dark:ring-white/10 flex flex-col"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="px-5 py-4 border-b border-black/[0.06] dark:border-white/10 flex items-start justify-between gap-4 bg-white/55 dark:bg-slate-950/40 backdrop-blur">
-                    <div>
-                      <div className="font-display text-lg font-extrabold text-slate-900 dark:text-white">Investment trend</div>
-                      <div className="mt-1 text-[12px] text-slate-500 dark:text-slate-300">Interactive timeline with verified insights</div>
-                      <div className="mt-1 text-[12px] text-slate-500 dark:text-slate-300">
-                        Status: {modalStats.decisionLabel.text}
-                        {topHoldingName ? ` - ${topHoldingName}` : ''}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {modalStats.hasAnyInvestment ? (
-                          <span
-                            className={[
-                              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 shadow-sm',
-                              modalStats.isUp
-                                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20'
-                                : 'bg-rose-50 text-rose-700 ring-rose-200/70 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/20',
-                            ].join(' ')}
-                          >
-                            {modalStats.isUp ? '▲' : '▼'} {Math.abs(modalStats.growthPct).toFixed(1)}%
-                          </span>
-                        ) : null}
-                        <span className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
-                          <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-300">vs</span>
-                          <select
-                            value={compareKey}
-                            onChange={(e) => setCompareKey(e.target.value as any)}
-                            className="bg-transparent outline-none border-0 ring-0 p-0 m-0 text-[11px] font-extrabold text-slate-700 dark:text-slate-200"
-                            aria-label="Compare percentage to"
-                          >
-                            {compareOptions.map((o) => (
-                              <option key={o.key} value={o.key}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                        </span>
-                        {modalStats.hasAnyInvestment ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
-                            P/L: {formatFromBase(modalStats.profit)}
-                          </span>
-                        ) : null}
-                        {modalStats.hasAnyInvestment ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
-                            Volatility score: {modalStats.volScore}
-                          </span>
-                        ) : null}
+          <div className="fixed inset-0 z-[10000]">
+            <div aria-hidden="true" className="fixed inset-0 bg-slate-950/55 backdrop-blur-md" onClick={() => setChartOpen(false)} />
+            <div className="relative h-full w-full flex items-start sm:items-center justify-center p-4 sm:p-6">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Investment trend"
+                className="relative w-[min(1100px,96vw)] h-[min(780px,92dvh)] overflow-hidden rounded-3xl bg-white/75 dark:bg-slate-950/70 backdrop-blur-xl shadow-[0_30px_80px_-40px_rgba(15,23,42,0.65)] ring-1 ring-black/10 dark:ring-white/10 flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-5 py-4 border-b border-black/[0.06] dark:border-white/10 flex items-start justify-between gap-4 bg-white/55 dark:bg-slate-950/40 backdrop-blur">
+                  <div>
+                    <div className="font-display text-lg font-extrabold text-slate-900 dark:text-white">Investment trend</div>
+                    <div className="mt-1 text-[12px] text-slate-500 dark:text-slate-300">Interactive timeline with verified insights</div>
+                    <div className="mt-1 text-[12px] text-slate-500 dark:text-slate-300">
+                      Status: {modalStats.decisionLabel.text}
+                      {topHoldingName ? ` - ${topHoldingName}` : ''}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {modalStats.hasAnyInvestment ? (
                         <span
                           className={[
                             'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 shadow-sm',
-                            'hidden',
-                            modalStats.decisionLabel.tone === 'good'
+                            modalStats.isUp
                               ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20'
-                              : modalStats.decisionLabel.tone === 'bad'
-                                ? 'bg-rose-50 text-rose-700 ring-rose-200/70 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/20'
-                                : 'bg-slate-50 text-slate-700 ring-slate-200/70 dark:bg-white/10 dark:text-slate-200 dark:ring-white/10',
+                              : 'bg-rose-50 text-rose-700 ring-rose-200/70 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/20',
                           ].join(' ')}
                         >
-                          {modalStats.decisionLabel.text}
-                          {topHoldingName ? ` • ${topHoldingName}` : ''}
+                          {modalStats.isUp ? '▲' : '▼'} {Math.abs(modalStats.growthPct).toFixed(1)}%
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setInfoOpen(true)}
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/10 transition-colors"
+                      ) : null}
+                      <span className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
+                        <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-300">vs</span>
+                        <select
+                          value={compareKey}
+                          onChange={(e) => setCompareKey(e.target.value as any)}
+                          className="bg-transparent outline-none border-0 ring-0 p-0 m-0 text-[11px] font-extrabold text-slate-700 dark:text-slate-200"
+                          aria-label="Compare percentage to"
                         >
-                          View info
-                        </button>
-                      </div>
+                          {compareOptions.map((o) => (
+                            <option key={o.key} value={o.key}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </span>
+                      {modalStats.hasAnyInvestment ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
+                          P/L: {formatFromBase(modalStats.profit)}
+                        </span>
+                      ) : null}
+                      {modalStats.hasAnyInvestment ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200">
+                          Volatility score: {modalStats.volScore}
+                        </span>
+                      ) : null}
+                      <span
+                        className={[
+                          'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 shadow-sm',
+                          'hidden',
+                          modalStats.decisionLabel.tone === 'good'
+                            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20'
+                            : modalStats.decisionLabel.tone === 'bad'
+                              ? 'bg-rose-50 text-rose-700 ring-rose-200/70 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/20'
+                              : 'bg-slate-50 text-slate-700 ring-slate-200/70 dark:bg-white/10 dark:text-slate-200 dark:ring-white/10',
+                        ].join(' ')}
+                      >
+                        {modalStats.decisionLabel.text}
+                        {topHoldingName ? ` • ${topHoldingName}` : ''}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setInfoOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-slate-900/40 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/10 transition-colors"
+                      >
+                        View info
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setChartOpen(false)}
-                      className="h-9 w-9 rounded-xl grid place-items-center text-slate-500 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-white/10 transition-colors"
-                      aria-label="Close"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-                      </svg>
-                    </button>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setChartOpen(false)}
+                    className="h-9 w-9 rounded-xl grid place-items-center text-slate-500 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-white/10 transition-colors"
+                    aria-label="Close"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </div>
 
-                  <div className="px-3 sm:px-5 py-4 flex-1 min-h-0 flex flex-col">
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                      {(modalStats.hasAnyInvestment
-                        ? ([
-                            {
-                              k: 'Portfolio growth',
-                              v: `${modalStats.growthPct >= 0 ? '+' : '-'}${Math.abs(modalStats.growthPct).toFixed(1)}%`,
-                              tone: modalStats.growthPct >= 0 ? 'emerald' : 'rose',
-                            },
-                            {
-                              k: 'Profit / Loss',
-                              v: formatFromBase(modalStats.profit),
-                              tone: modalStats.profit >= 0 ? 'emerald' : 'rose',
-                            },
-                            {
-                              k: 'Volatility score',
-                              v: String(modalStats.volScore),
-                              tone: 'slate',
-                            },
-                            {
-                              k: 'Risk meter',
-                              v: `${modalStats.riskScore}%`,
-                              tone: modalStats.risk01 > 0.66 ? 'rose' : modalStats.risk01 > 0.4 ? 'amber' : 'emerald',
-                              meter: modalStats.risk01,
-                            },
-                          ] as const)
-                        : ([
-                            { k: 'Profit / Loss', v: formatFromBase(0), tone: 'slate' },
-                            { k: 'Status', v: 'Add investments to evaluate', tone: 'slate' },
-                          ] as const)
-                      ).map((c) => (
-                        <div
-                          key={c.k}
-                          className="rounded-2xl bg-white/70 dark:bg-slate-900/35 ring-1 ring-black/[0.06] dark:ring-white/10 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.55)] px-3 py-2.5"
-                        >
-                          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-300">{c.k}</div>
-                          <div className="mt-1 text-[13px] font-extrabold text-slate-900 dark:text-white tabular-nums">{c.v}</div>
-                          {'meter' in c ? (
-                            <div className="mt-2 h-1.5 rounded-full bg-slate-200/60 dark:bg-white/10 overflow-hidden">
-                              <div
-                                className={[
-                                  'h-full rounded-full',
-                                  c.tone === 'emerald'
-                                    ? 'bg-gradient-to-r from-emerald-400/40 to-emerald-500/80'
-                                    : c.tone === 'amber'
-                                      ? 'bg-gradient-to-r from-amber-400/40 to-amber-500/80'
-                                      : 'bg-gradient-to-r from-rose-400/40 to-rose-500/80',
-                                ].join(' ')}
-                                style={{ width: `${Math.round((c as any).meter * 100)}%` }}
-                              />
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="text-[12px] font-semibold text-slate-700 dark:text-slate-200">Range</div>
-                        <div className="flex items-center gap-1 rounded-2xl bg-white/70 dark:bg-slate-900/35 ring-1 ring-black/[0.06] dark:ring-white/10 p-1 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.55)]">
-                          {rangeOptions.map((o) => {
-                            const activeTab = o.days === rangeDays && !brushRange;
-                            return (
-                              <button
-                                key={o.days}
-                                type="button"
-                                onClick={() => {
-                                  setBrushRange(null);
-                                  setViewEndIndex(null);
-                                  setRangeDays(o.days);
-                                }}
-                                className={[
-                                  'h-8 px-3 rounded-xl text-[11px] font-extrabold transition-all',
-                                  activeTab
-                                    ? 'bg-white dark:bg-slate-950 text-slate-950 dark:text-white ring-1 ring-black/[0.06] dark:ring-white/10 shadow-sm'
-                                    : 'text-slate-500 dark:text-slate-300 hover:text-slate-700 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10',
-                                ].join(' ')}
-                                aria-pressed={activeTab}
-                              >
-                                {o.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        {modalStats.hasAnyInvestment ? (
-                          <button
-                            type="button"
-                            onClick={() => setShowPrediction((v) => !v)}
-                            className="h-9 px-3 rounded-2xl text-[12px] font-extrabold bg-white/70 dark:bg-slate-900/35 text-slate-700 dark:text-slate-200 ring-1 ring-black/[0.06] dark:ring-white/10 hover:bg-white dark:hover:bg-white/10 shadow-sm transition-colors"
-                          >
-                            {showPrediction ? 'Forecast: On' : 'Forecast: Off'}
-                          </button>
+                <div className="px-3 sm:px-5 py-4 flex-1 min-h-0 flex flex-col">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    {(modalStats.hasAnyInvestment
+                      ? ([
+                        {
+                          k: 'Portfolio growth',
+                          v: `${modalStats.growthPct >= 0 ? '+' : '-'}${Math.abs(modalStats.growthPct).toFixed(1)}%`,
+                          tone: modalStats.growthPct >= 0 ? 'emerald' : 'rose',
+                        },
+                        {
+                          k: 'Profit / Loss',
+                          v: formatFromBase(modalStats.profit),
+                          tone: modalStats.profit >= 0 ? 'emerald' : 'rose',
+                        },
+                        {
+                          k: 'Volatility score',
+                          v: String(modalStats.volScore),
+                          tone: 'slate',
+                        },
+                        {
+                          k: 'Risk meter',
+                          v: `${modalStats.riskScore}%`,
+                          tone: modalStats.risk01 > 0.66 ? 'rose' : modalStats.risk01 > 0.4 ? 'amber' : 'emerald',
+                          meter: modalStats.risk01,
+                        },
+                      ] as const)
+                      : ([
+                        { k: 'Profit / Loss', v: formatFromBase(0), tone: 'slate' },
+                        { k: 'Status', v: 'Add investments to evaluate', tone: 'slate' },
+                      ] as const)
+                    ).map((c) => (
+                      <div
+                        key={c.k}
+                        className="rounded-2xl bg-white/70 dark:bg-slate-900/35 ring-1 ring-black/[0.06] dark:ring-white/10 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.55)] px-3 py-2.5"
+                      >
+                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-300">{c.k}</div>
+                        <div className="mt-1 text-[13px] font-extrabold text-slate-900 dark:text-white tabular-nums">{c.v}</div>
+                        {'meter' in c ? (
+                          <div className="mt-2 h-1.5 rounded-full bg-slate-200/60 dark:bg-white/10 overflow-hidden">
+                            <div
+                              className={[
+                                'h-full rounded-full',
+                                c.tone === 'emerald'
+                                  ? 'bg-gradient-to-r from-emerald-400/40 to-emerald-500/80'
+                                  : c.tone === 'amber'
+                                    ? 'bg-gradient-to-r from-amber-400/40 to-amber-500/80'
+                                    : 'bg-gradient-to-r from-rose-400/40 to-rose-500/80',
+                              ].join(' ')}
+                              style={{ width: `${Math.round((c as any).meter * 100)}%` }}
+                            />
+                          </div>
                         ) : null}
                       </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="text-[12px] font-semibold text-slate-700 dark:text-slate-200">Range</div>
+                      <div className="flex items-center gap-1 rounded-2xl bg-white/70 dark:bg-slate-900/35 ring-1 ring-black/[0.06] dark:ring-white/10 p-1 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.55)]">
+                        {rangeOptions.map((o) => {
+                          const activeTab = o.days === rangeDays && !brushRange;
+                          return (
+                            <button
+                              key={o.days}
+                              type="button"
+                              onClick={() => {
+                                setBrushRange(null);
+                                setViewEndIndex(null);
+                                setRangeDays(o.days);
+                              }}
+                              className={[
+                                'h-8 px-3 rounded-xl text-[11px] font-extrabold transition-all',
+                                activeTab
+                                  ? 'bg-white dark:bg-slate-950 text-slate-950 dark:text-white ring-1 ring-black/[0.06] dark:ring-white/10 shadow-sm'
+                                  : 'text-slate-500 dark:text-slate-300 hover:text-slate-700 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10',
+                              ].join(' ')}
+                              aria-pressed={activeTab}
+                            >
+                              {o.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
-                    <div className="flex-1 min-h-0">
-                      <div
-                        ref={chartViewportRef}
-                        onPointerDown={handlePointerDown}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        onPointerCancel={handlePointerUp}
-                        onPointerLeave={handlePointerUp}
-                        className="relative h-full w-full select-none touch-none cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden outline-none border-0 ring-0"
-                        aria-label="Chart"
-                      >
-                        <div className="relative h-full w-full">
-                          {!modalStats.hasAnyInvestment ? (
-                            <div className="absolute inset-0 grid place-items-center">
-                              <div className="text-[14px] font-extrabold text-slate-400">No Data</div>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="absolute inset-0 bg-white/35 backdrop-blur-[2px]" />
-                              <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={composedData as any} margin={{ top: 26, right: 28, bottom: 24, left: 0 }}>
-                                  <defs>
-                                    <linearGradient id={`${strokeId}-modal`} x1="0" y1="0" x2="1" y2="0">
-                                      <stop offset="0%" stopColor="#A78BFA" stopOpacity={0.65} />
-                                      <stop offset="45%" stopColor="#7C3AED" stopOpacity={1} />
-                                      <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.9} />
-                                    </linearGradient>
-                                    <linearGradient id={`${fillId}-modal`} x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.14} />
-                                      <stop offset="55%" stopColor="#7C3AED" stopOpacity={0.05} />
-                                      <stop offset="100%" stopColor="#7C3AED" stopOpacity={0.0} />
-                                    </linearGradient>
-                                  </defs>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {modalStats.hasAnyInvestment ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowPrediction((v) => !v)}
+                          className="h-9 px-3 rounded-2xl text-[12px] font-extrabold bg-white/70 dark:bg-slate-900/35 text-slate-700 dark:text-slate-200 ring-1 ring-black/[0.06] dark:ring-white/10 hover:bg-white dark:hover:bg-white/10 shadow-sm transition-colors"
+                        >
+                          {showPrediction ? 'Forecast: On' : 'Forecast: Off'}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
 
-                                  <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.05)" />
-                                  <XAxis
-                                    dataKey="ts"
-                                    type="number"
-                                    domain={['dataMin', 'dataMax']}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }}
-                                    dy={10}
-                                    tickFormatter={xTickFormatter as any}
-                                    tickMargin={12}
-                                    interval="preserveStartEnd"
-                                    minTickGap={18}
-                                  />
-                                  <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={yAxisTickCompact as any}
-                                    width={96}
-                                    tickMargin={0}
-                                    domain={modalYDomain as any}
-                                    tickCount={6}
-                                  />
+                  <div className="flex-1 min-h-0">
+                    <div
+                      ref={chartViewportRef}
+                      onPointerDown={handlePointerDown}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={handlePointerUp}
+                      onPointerCancel={handlePointerUp}
+                      onPointerLeave={handlePointerUp}
+                      className="relative h-full w-full select-none touch-none cursor-grab active:cursor-grabbing rounded-2xl overflow-hidden outline-none border-0 ring-0"
+                      aria-label="Chart"
+                    >
+                      <div className="relative h-full w-full">
+                        {!modalStats.hasAnyInvestment ? (
+                          <div className="absolute inset-0 grid place-items-center">
+                            <div className="text-[14px] font-extrabold text-slate-400">No Data</div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="absolute inset-0 bg-white/35 backdrop-blur-[2px]" />
+                            <ResponsiveContainer width="100%" height="100%">
+                              <ComposedChart data={composedData as any} margin={{ top: 26, right: 28, bottom: 24, left: 0 }}>
+                                <defs>
+                                  <linearGradient id={`${strokeId}-modal`} x1="0" y1="0" x2="1" y2="0">
+                                    <stop offset="0%" stopColor="#A78BFA" stopOpacity={0.65} />
+                                    <stop offset="45%" stopColor="#7C3AED" stopOpacity={1} />
+                                    <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.9} />
+                                  </linearGradient>
+                                  <linearGradient id={`${fillId}-modal`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.14} />
+                                    <stop offset="55%" stopColor="#7C3AED" stopOpacity={0.05} />
+                                    <stop offset="100%" stopColor="#7C3AED" stopOpacity={0.0} />
+                                  </linearGradient>
+                                </defs>
 
-                                  <Tooltip content={<ModalTooltip formatValue={formatFromBase} />} cursor={{ stroke: 'rgba(124,58,237,0.18)', strokeWidth: 1 }} />
+                                <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.05)" />
+                                <XAxis
+                                  dataKey="ts"
+                                  type="number"
+                                  domain={['dataMin', 'dataMax']}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }}
+                                  dy={10}
+                                  tickFormatter={xTickFormatter as any}
+                                  tickMargin={12}
+                                  interval="preserveStartEnd"
+                                  minTickGap={18}
+                                />
+                                <YAxis
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={yAxisTickCompact as any}
+                                  width={96}
+                                  tickMargin={0}
+                                  domain={modalYDomain as any}
+                                  tickCount={6}
+                                />
 
-                                  {/*
+                                <Tooltip content={<ModalTooltip formatValue={formatFromBase} />} cursor={{ stroke: 'rgba(124,58,237,0.18)', strokeWidth: 1 }} />
+
+                                {/*
                                     Intentionally omit the invested-capital reference line in this premium view to keep the chart clean.
                                     It was rendering as a dotted horizontal line and visually competing with the data series.
                                   */}
 
-                                  {showPrediction ? (
-                                    <Line
-                                      type="monotone"
-                                      dataKey="pred"
-                                      stroke="rgba(99,102,241,0.55)"
-                                      strokeDasharray="3 7"
-                                      strokeWidth={2.2}
-                                      dot={false}
-                                      activeDot={false as any}
-                                      connectNulls
-                                      isAnimationActive={false}
-                                    />
-                                  ) : null}
-
+                                {showPrediction ? (
                                   <Line
                                     type="monotone"
-                                    dataKey="value"
-                                    stroke={`url(#${strokeId}-modal)`}
-                                    strokeWidth={2.6}
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                                    dataKey="pred"
+                                    stroke="rgba(99,102,241,0.55)"
+                                    strokeDasharray="3 7"
+                                    strokeWidth={2.2}
                                     dot={false}
+                                    activeDot={false as any}
                                     connectNulls
-                                    isAnimationActive
-                                    animationDuration={950}
-                                    animationEasing="ease-out"
-                                    activeDot={{ r: 4.6, fill: '#7C3AED', stroke: '#ffffff', strokeWidth: 2 }}
+                                    isAnimationActive={false}
                                   />
-                                </ComposedChart>
-                              </ResponsiveContainer>
-                            </>
-                          )}
-                        </div>
+                                ) : null}
+
+                                <Line
+                                  type="monotone"
+                                  dataKey="value"
+                                  stroke={`url(#${strokeId}-modal)`}
+                                  strokeWidth={2.6}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  dot={false}
+                                  connectNulls
+                                  isAnimationActive
+                                  animationDuration={950}
+                                  animationEasing="ease-out"
+                                  activeDot={{ r: 4.6, fill: '#7C3AED', stroke: '#ffffff', strokeWidth: 2 }}
+                                />
+                              </ComposedChart>
+                            </ResponsiveContainer>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {infoOpen ? (
-                    <div className="absolute inset-0 z-50">
+                {infoOpen ? (
+                  <div className="absolute inset-0 z-50">
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 bg-slate-950/30 dark:bg-slate-950/55 backdrop-blur-sm"
+                      onClick={() => setInfoOpen(false)}
+                    />
+                    <div className="absolute inset-0 p-0 flex items-start sm:items-center justify-center">
                       <div
-                        aria-hidden="true"
-                        className="absolute inset-0 bg-slate-950/30 dark:bg-slate-950/55 backdrop-blur-sm"
-                        onClick={() => setInfoOpen(false)}
-                      />
-                      <div className="absolute inset-0 p-0 flex items-start sm:items-center justify-center">
-                        <div
-                          role="dialog"
-                          aria-modal="true"
-                          aria-label="Investment summary"
-                          className="w-[min(1600px,100vw)] max-h-[min(860px,96dvh)] overflow-hidden rounded-none sm:rounded-[32px] bg-white shadow-[0_34px_100px_-55px_rgba(15,23,42,0.55)] ring-1 ring-black/10 flex flex-col"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="sticky top-0 z-30 px-6 py-5 border-b border-black/[0.06] flex items-start justify-between gap-4 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-                            <div>
-                              <div className="font-display text-[22px] sm:text-[26px] leading-tight font-extrabold text-slate-900">Portfolio Summary</div>
-                              <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-slate-600">
-                                {summaryStats.hasAnyInvestment ? (
-                                  <>
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 font-extrabold text-emerald-700 ring-1 ring-emerald-200/70">
-                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                      Healthy Growth
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700 ring-1 ring-black/5">
-                                      ↑ +4.2% this month
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-extrabold text-slate-700 ring-1 ring-black/5">
-                                    Add investments to start tracking
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Investment summary"
+                        className="w-[min(1600px,100vw)] max-h-[min(860px,96dvh)] overflow-hidden rounded-none sm:rounded-[32px] bg-white shadow-[0_34px_100px_-55px_rgba(15,23,42,0.55)] ring-1 ring-black/10 flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="sticky top-0 z-30 px-6 py-5 border-b border-black/[0.06] flex items-start justify-between gap-4 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+                          <div>
+                            <div className="font-display text-[22px] sm:text-[26px] leading-tight font-extrabold text-slate-900">Portfolio Summary</div>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-slate-600">
+                              {summaryStats.hasAnyInvestment ? (
+                                <>
+                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 font-extrabold text-emerald-700 ring-1 ring-emerald-200/70">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                    Healthy Growth
                                   </span>
-                                )}
-                              </div>
-                              <div className="mt-2 text-[12px] text-slate-500">
-                                {activePositions.length} active holding{activePositions.length === 1 ? '' : 's'}
-                                {' • '}
-                                Status: {summaryStats.decisionLabel.text}
-                                {summaryStats.hasAnyInvestment ? (
-                                  <>
-                                    {' • '}Risk {summaryStats.riskScore}%{' • '}Volatility {summaryStats.volScore}
-                                  </>
-                                ) : null}
-                              </div>
+                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700 ring-1 ring-black/5">
+                                    ↑ +4.2% this month
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-extrabold text-slate-700 ring-1 ring-black/5">
+                                  Add investments to start tracking
+                                </span>
+                              )}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setInfoOpen(false)}
-                              className="h-10 w-10 rounded-2xl grid place-items-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors ring-1 ring-black/5 shadow-sm"
-                              aria-label="Close"
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-                              </svg>
-                            </button>
+                            <div className="mt-2 text-[12px] text-slate-500">
+                              {activePositions.length} active holding{activePositions.length === 1 ? '' : 's'}
+                              {' • '}
+                              Status: {summaryStats.decisionLabel.text}
+                              {summaryStats.hasAnyInvestment ? (
+                                <>
+                                  {' • '}Risk {summaryStats.riskScore}%{' • '}Volatility {summaryStats.volScore}
+                                </>
+                              ) : null}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setInfoOpen(false)}
+                            className="h-10 w-10 rounded-2xl grid place-items-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors ring-1 ring-black/5 shadow-sm"
+                            aria-label="Close"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        <div className="overflow-auto bg-white">
+                          <div className="sticky top-0 z-20 px-6 pt-5 pb-4 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-b border-black/[0.06]">
+                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                              <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
+                                <div className="mt-2 text-[12px] font-semibold text-slate-500">Total Value</div>
+                                <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{formatFromBase(Number(total) || 0)}</div>
+                              </div>
+                              <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
+                                <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-sky-500/55 to-violet-500/55" />
+                                <div className="mt-2 text-[12px] font-semibold text-slate-500">Invested</div>
+                                <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{formatFromBase(Number(investAmount) || 0)}</div>
+                              </div>
+                              <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
+                                <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-emerald-500/55 to-teal-500/55" />
+                                <div className="mt-2 text-[12px] font-semibold text-slate-500">Profit / Loss</div>
+                                <div className={['mt-1 text-[18px] sm:text-[20px] font-extrabold tabular-nums', summaryStats.profit >= 0 ? 'text-emerald-700' : 'text-rose-700'].join(' ')}>
+                                  {summaryStats.profit >= 0 ? '+' : '-'}{formatFromBase(Math.abs(summaryStats.profit))}
+                                </div>
+                                <div className={['mt-1 text-sm tabular-nums font-semibold', summaryStats.profitPct >= 0 ? 'text-emerald-600' : 'text-rose-600'].join(' ')}>
+                                  {summaryStats.profitPct >= 0 ? '+' : '-'}{Math.abs(summaryStats.profitPct).toFixed(1)}%
+                                </div>
+                              </div>
+                              {summaryStats.hasAnyInvestment ? (
+                                <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
+                                  <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-indigo-500/45 to-violet-500/45" />
+                                  <div className="mt-2 text-[12px] font-semibold text-slate-500">CAGR (est.)</div>
+                                  <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{(summaryStats.cagrPct * 100).toFixed(1)}%</div>
+                                </div>
+                              ) : null}
+                              {summaryStats.hasAnyInvestment ? (
+                                <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
+                                  <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-amber-500/55 to-orange-500/55" />
+                                  <div className="mt-2 text-[12px] font-semibold text-slate-500">Risk Score</div>
+                                  <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{summaryStats.riskScore}%</div>
+                                </div>
+                              ) : null}
+                              {summaryStats.hasAnyInvestment ? (
+                                <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
+                                  <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-emerald-500/45 to-indigo-500/45" />
+                                  <div className="mt-2 text-[12px] font-semibold text-slate-500">Health</div>
+                                  <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900">{portfolioHealthText}</div>
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
 
-                          <div className="overflow-auto bg-white">
-                            <div className="sticky top-0 z-20 px-6 pt-5 pb-4 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-b border-black/[0.06]">
-                              <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                                <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
-                                  <div className="mt-2 text-[12px] font-semibold text-slate-500">Total Value</div>
-                                  <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{formatFromBase(Number(total) || 0)}</div>
-                                </div>
-                                <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
-                                  <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-sky-500/55 to-violet-500/55" />
-                                  <div className="mt-2 text-[12px] font-semibold text-slate-500">Invested</div>
-                                  <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{formatFromBase(Number(investAmount) || 0)}</div>
-                                </div>
-                                <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
-                                  <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-emerald-500/55 to-teal-500/55" />
-                                  <div className="mt-2 text-[12px] font-semibold text-slate-500">Profit / Loss</div>
-                                  <div className={['mt-1 text-[18px] sm:text-[20px] font-extrabold tabular-nums', summaryStats.profit >= 0 ? 'text-emerald-700' : 'text-rose-700'].join(' ')}>
-                                    {summaryStats.profit >= 0 ? '+' : '-'}{formatFromBase(Math.abs(summaryStats.profit))}
-                                  </div>
-                                  <div className={['mt-1 text-sm tabular-nums font-semibold', summaryStats.profitPct >= 0 ? 'text-emerald-600' : 'text-rose-600'].join(' ')}>
-                                    {summaryStats.profitPct >= 0 ? '+' : '-'}{Math.abs(summaryStats.profitPct).toFixed(1)}%
-                                  </div>
-                                </div>
-                                {summaryStats.hasAnyInvestment ? (
-                                  <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
-                                    <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-indigo-500/45 to-violet-500/45" />
-                                    <div className="mt-2 text-[12px] font-semibold text-slate-500">CAGR (est.)</div>
-                                    <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{(summaryStats.cagrPct * 100).toFixed(1)}%</div>
-                                  </div>
-                                ) : null}
-                                {summaryStats.hasAnyInvestment ? (
-                                  <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
-                                    <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-amber-500/55 to-orange-500/55" />
-                                    <div className="mt-2 text-[12px] font-semibold text-slate-500">Risk Score</div>
-                                    <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900 tabular-nums">{summaryStats.riskScore}%</div>
-                                  </div>
-                                ) : null}
-                                {summaryStats.hasAnyInvestment ? (
-                                  <div className="group rounded-3xl bg-white/95 ring-1 ring-black/[0.06] shadow-[0_18px_45px_-40px_rgba(15,23,42,0.55)] px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_64px_-50px_rgba(15,23,42,0.60)]">
-                                    <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-emerald-500/45 to-indigo-500/45" />
-                                    <div className="mt-2 text-[12px] font-semibold text-slate-500">Health</div>
-                                    <div className="mt-1 text-[18px] sm:text-[20px] font-extrabold text-slate-900">{portfolioHealthText}</div>
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-
-                            <div className="px-6 pb-6 pt-5">
-                              <div className="rounded-3xl bg-white ring-1 ring-black/[0.06] shadow-[0_22px_55px_-48px_rgba(15,23,42,0.55)] overflow-hidden">
+                          <div className="px-6 pb-6 pt-5">
+                            <div className="rounded-3xl bg-white ring-1 ring-black/[0.06] shadow-[0_22px_55px_-48px_rgba(15,23,42,0.55)] overflow-hidden">
                               <div className="sticky top-0 z-10 grid grid-cols-7 gap-2 px-4 py-2 text-[11px] font-extrabold text-slate-500 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75 border-b border-black/[0.06]">
                                 <div className="col-span-2">Holding</div>
                                 <div className="text-right">Entry</div>
@@ -1635,7 +1822,7 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
                                   <div className="px-4 py-6 text-[12px] text-slate-500">No active investments found.</div>
                                 )}
                               </div>
-                              </div>
+                            </div>
 
                             <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
                               <div className="rounded-3xl bg-white ring-1 ring-black/[0.06] shadow-[0_22px_55px_-48px_rgba(15,23,42,0.55)] px-5 py-4">
@@ -1657,28 +1844,28 @@ export default function InvestmentSummaryCard({ title = 'Total Investment', tota
                                 </div>
                                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
                                   {projections.horizons.filter((h) => ['3M', '6M', '1Y', '3Y', '5Y'].includes(h.k)).map((h) => (
-                                      <div
-                                        key={h.k}
-                                        className="rounded-2xl bg-white ring-1 ring-black/[0.06] px-3 py-2.5 shadow-[0_18px_45px_-42px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-48px_rgba(15,23,42,0.55)]"
-                                      >
-                                        <div className="text-[10px] font-extrabold text-slate-500">{h.k}</div>
-                                        <div className="mt-1 text-[13px] font-extrabold text-slate-900 tabular-nums">{formatFromBase(h.v)}</div>
-                                      </div>
-                                    ))}
+                                    <div
+                                      key={h.k}
+                                      className="rounded-2xl bg-white ring-1 ring-black/[0.06] px-3 py-2.5 shadow-[0_18px_45px_-42px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-48px_rgba(15,23,42,0.55)]"
+                                    >
+                                      <div className="text-[10px] font-extrabold text-slate-500">{h.k}</div>
+                                      <div className="mt-1 text-[13px] font-extrabold text-slate-900 tabular-nums">{formatFromBase(h.v)}</div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                       </div>
-                     </div>
+                      </div>
                     </div>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </div>
-            </div>,
-            document.body
-          )
+            </div>
+          </div>,
+          document.body
+        )
         : null}
     </div>
   );

@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ExpenseProvider } from './contexts/ExpenseContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { AmountsVisibilityProvider } from './contexts/AmountsVisibilityContext';
+import { BudgetProvider } from './contexts/BudgetContext';
 import MainLayout from './components/MainLayout';
 import LandingPage from './components/LandingPage';
 import QrTransferPage from './pages/QrTransferPage';
@@ -123,11 +124,13 @@ function App() {
     <IonApp>
       <AuthProvider>
         <ExpenseProvider>
-          <CurrencyProvider>
-            <AmountsVisibilityProvider>
-              <AppContent />
-            </AmountsVisibilityProvider>
-          </CurrencyProvider>
+          <BudgetProvider>
+            <CurrencyProvider>
+              <AmountsVisibilityProvider>
+                <AppContent />
+              </AmountsVisibilityProvider>
+            </CurrencyProvider>
+          </BudgetProvider>
         </ExpenseProvider>
       </AuthProvider>
     </IonApp>

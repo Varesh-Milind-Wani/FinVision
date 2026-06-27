@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useExpenseContext } from '../contexts/ExpenseContext';
 import { useAmountsVisibility } from '../contexts/AmountsVisibilityContext';
@@ -555,84 +555,86 @@ const ExportImport = () => {
   };
 
   return (
-    <div className="surface surface-pad mb-8 animate-float-in">
-      <h2 className="font-display text-xl font-bold text-slate-900 dark:text-white mb-6">Export & Import</h2>
-      
-      <div className="flex flex-col gap-4">
+    <div className="animate-float-in pb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Export Section */}
-        <div className="bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/10">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="bg-blue-600 rounded-2xl p-2 shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] p-6 shadow-sm ring-1 ring-black/5 dark:ring-white/[0.05] flex flex-col transition-all hover:shadow-md">
+          <div className="flex items-start gap-4 mb-5">
+            <div className="bg-blue-100 dark:bg-blue-500/20 rounded-2xl p-3 shrink-0 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
               </svg>
             </div>
-            <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">Export Your Data</h3>
+            <div>
+              <h3 className="font-display text-lg font-bold text-slate-900 dark:text-white mb-1">Export Data</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                Download your transactions as Excel (CSV) or save a comprehensive PDF report for your records.
+              </p>
+            </div>
           </div>
           
-          <p className="text-slate-600 dark:text-slate-300 mb-4">
-            Download your transactions as Excel, or save a PDF report.
-          </p>
-          
-          <div className="flex flex-wrap gap-3 mb-4">
+          <div className="mt-auto pt-4 flex flex-col gap-3">
             <button 
               onClick={() => exportData('excel')} 
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center transition-colors shadow-soft focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={transactions.length === 0 || isExporting}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Excel (CSV)
+              Export as Excel (CSV)
             </button>
             <button 
               onClick={() => exportData('pdf')} 
-              className="btn-surface disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={transactions.length === 0 || isExporting}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
               </svg>
-              PDF
+              Save PDF Report
             </button>
           </div>
           
           {transactions.length === 0 && (
-            <div className="flex items-center mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-2xl text-amber-800 dark:text-amber-200 text-sm ring-1 ring-amber-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <div className="mt-4 flex items-center p-3.5 bg-amber-50 dark:bg-amber-900/20 rounded-2xl text-amber-800 dark:text-amber-200 text-sm font-medium">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <span>You need to add transactions before exporting data</span>
+              <span>Add transactions first to export data.</span>
             </div>
           )}
           
-          <div className="text-xs text-slate-500 dark:text-slate-400">
-            <span className="font-medium">Tip:</span> Export regularly to backup your financial data
+          <div className="mt-4 text-xs text-center text-slate-500 dark:text-slate-400 font-medium">
+            Export regularly to safely backup your financial data.
           </div>
         </div>
         
         {/* Import Section */}
-        <div className="bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/10">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="bg-emerald-600 rounded-2xl p-2 shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] p-6 shadow-sm ring-1 ring-black/5 dark:ring-white/[0.05] flex flex-col transition-all hover:shadow-md">
+          <div className="flex items-start gap-4 mb-5">
+            <div className="bg-emerald-100 dark:bg-emerald-500/20 rounded-2xl p-3 shrink-0 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
             </div>
-            <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">Import Data</h3>
+            <div>
+              <h3 className="font-display text-lg font-bold text-slate-900 dark:text-white mb-1">Import Data</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                Restore your full FinVision backup (JSON) or instantly import transactions from a CSV file.
+              </p>
+            </div>
           </div>
           
-          <p className="text-slate-600 dark:text-slate-300 mb-4">
-            Restore your full backup (JSON) or import transactions from a CSV export.
-          </p>
-          
-          <div className="mb-4">
+          <div className="mt-auto pt-4">
             <button
               onClick={() => document.getElementById('file-upload').click()}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center transition-colors shadow-soft focus:outline-none focus:ring-2 focus:ring-emerald-500/40 w-full"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isImporting}
             >
-              <span className="mr-2" aria-hidden="true">*</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
               Select File to Import
             </button>
             <input 
@@ -646,35 +648,29 @@ const ExportImport = () => {
           </div>
           
           {importError && (
-            <div className="flex items-center mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-2xl text-red-700 dark:text-red-200 text-sm ring-1 ring-red-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="mt-4 flex items-center p-3.5 bg-red-50 dark:bg-red-900/20 rounded-2xl text-red-700 dark:text-red-200 text-sm font-medium">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>{importError}</span>
             </div>
           )}
           
           {importSuccess && (
-            <div className="flex items-center mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-800 dark:text-emerald-200 text-sm ring-1 ring-emerald-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="mt-4 flex items-center p-3.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-800 dark:text-emerald-200 text-sm font-medium">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 shrink-0 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>{importSuccess}</span>
             </div>
           )}
           
-          <div className="px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/60 dark:bg-slate-900/40">
-            <div className="text-xs text-slate-600 dark:text-slate-300 font-semibold mb-1">Supported Format</div>
-            <div className="flex items-center">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
-                JSON
-              </span>
-              <span className="mx-2 text-xs text-slate-400" aria-hidden="true">â€¢</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-200">
-                CSV
-              </span>
-              <span className="mx-1 text-xs text-slate-400" aria-hidden="true">*</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">Previously exported data</span>
+          <div className="mt-4 flex flex-col items-center justify-center py-4 bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-white/5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Supported Formats</span>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">JSON</span>
+              <span className="text-slate-300 dark:text-slate-600">&bull;</span>
+              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">CSV</span>
             </div>
           </div>
         </div>
