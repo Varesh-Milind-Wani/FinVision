@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/FinVision/static/css/main.10d2b887.css",
-    "main.js": "/FinVision/static/js/main.b2caea0b.js",
+    "main.css": "/FinVision/static/css/main.4c945bed.css",
+    "main.js": "/FinVision/static/js/main.d802fc97.js",
     "static/js/472.5d46935e.chunk.js": "/FinVision/static/js/472.5d46935e.chunk.js",
     "static/js/777.39674cf5.chunk.js": "/FinVision/static/js/777.39674cf5.chunk.js",
     "static/js/117.12663487.chunk.js": "/FinVision/static/js/117.12663487.chunk.js",
@@ -32,7 +32,7 @@
     "static/media/finvision-mark.svg": "/FinVision/static/media/finvision-mark.ea65be45930babee0445822cee242ddd.svg"
   },
   "entrypoints": [
-    "static/css/main.10d2b887.css",
-    "static/js/main.b2caea0b.js"
+    "static/css/main.4c945bed.css",
+    "static/js/main.d802fc97.js"
   ]
 }
