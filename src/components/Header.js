@@ -276,8 +276,8 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
       <div
         className="pointer-events-auto"
         style={{
-          height: '72px',
-          borderRadius: '34px',
+          height: '64px',
+          borderRadius: '32px',
           background: 'linear-gradient(170deg, rgba(255,255,255,0.94) 0%, rgba(246,248,255,0.90) 100%)',
           backdropFilter: 'blur(48px) saturate(240%) brightness(1.05)',
           WebkitBackdropFilter: 'blur(48px) saturate(240%) brightness(1.05)',
@@ -291,7 +291,7 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
           ].join(', '),
           display: 'flex',
           alignItems: 'center',
-          padding: '0 8px',
+          padding: '0 4px',
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -326,8 +326,8 @@ const Header = ({ activeTab = 'dashboard', onNavigate, onPreload }) => {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px',
-                padding: '8px 4px 6px',
+                gap: '2px',
+                padding: '6px 4px 4px',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
